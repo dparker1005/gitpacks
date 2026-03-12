@@ -55,15 +55,42 @@ async function loadPopularRepos() {
       </div>`;
       return;
     }
-    popularRepos.innerHTML = `<div class="popular-section">
-      <h3 class="popular-title">Popular Repos</h3>
-      <div class="popular-grid">${repos.map(r => `
-        <button class="popular-repo-btn" data-repo="${r.name}">
+    // Add collection progress from localStorage
+    repos.forEach(r => {
+      try {
+        const lib = JSON.parse(localStorage.getItem('ghtc_lib_' + r.name.toLowerCase()) || '{}');
+        r.collected = Object.keys(lib).length;
+      } catch (e) { r.collected = 0; }
+      r.pct = r.cards > 0 ? r.collected / r.cards : 0;
+    });
+    const yourRepos = repos.filter(r => r.collected > 0).sort((a, b) => b.pct - a.pct || b.cards - a.cards);
+    const otherRepos = repos.filter(r => r.collected === 0).sort((a, b) => b.cards - a.cards);
+
+    function repoBtn(r) {
+      const pctNum = Math.round(r.pct * 100);
+      return `<button class="popular-repo-btn" data-repo="${r.name}">
           <span class="popular-repo-name">${r.name}</span>
-          <span class="popular-repo-cards">${r.cards} cards</span>
-        </button>`).join('')}
-      </div>
-    </div>`;
+          <span class="popular-repo-meta">
+            <span class="popular-repo-progress">${r.collected}/${r.cards}</span>
+            <span class="popular-repo-pct">${pctNum}%</span>
+          </span>
+        </button>`;
+    }
+
+    let html = '';
+    if (yourRepos.length) {
+      html += `<div class="popular-section">
+        <h3 class="popular-title">Your Repos</h3>
+        <div class="popular-grid">${yourRepos.map(repoBtn).join('')}</div>
+      </div>`;
+    }
+    if (otherRepos.length) {
+      html += `<div class="popular-section">
+        <h3 class="popular-title">Popular Repos</h3>
+        <div class="popular-grid">${otherRepos.map(repoBtn).join('')}</div>
+      </div>`;
+    }
+    popularRepos.innerHTML = html;
     popularRepos.querySelectorAll('.popular-repo-btn').forEach(b => {
       b.addEventListener('click', () => quickLoad(b.dataset.repo));
     });

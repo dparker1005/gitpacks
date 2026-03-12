@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cache, CACHE_TTL } from '../../../cache';
+import { getCachedRepo } from '../../../cache';
 
 interface Contributor {
   rarity: string;
@@ -86,16 +86,16 @@ export async function GET(
   }
 
   const cacheKey = `${owner}/${repo}`.toLowerCase();
-  const cached = cache.get(cacheKey);
+  const cached = await getCachedRepo(cacheKey);
 
-  if (!cached || Date.now() - cached.ts >= CACHE_TTL) {
+  if (!cached) {
     return NextResponse.json(
       { error: 'Repo data not cached. Fetch /api/repo/[owner]/[repo] first.' },
       { status: 404 }
     );
   }
 
-  const allContributors: Contributor[] = cached.data;
+  const allContributors: Contributor[] = cached;
 
   if (!Array.isArray(allContributors) || allContributors.length === 0) {
     return NextResponse.json({ error: 'No contributor data available' }, { status: 404 });

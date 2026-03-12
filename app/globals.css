@@ -566,6 +566,8 @@
     .fs-stat-row.fs-highlight .fs-stat-value { color:#fff; font-weight:700; }
     .fs-stat-row.fs-highlight .fs-stat-label { font-weight:600; }
     @media (max-width: 800px) {
+      .top-bar { position:static; justify-content:flex-end; padding:12px 20px 0; }
+      header { padding-top:8px; }
       .fullscreen-overlay { overflow-y:auto; -webkit-overflow-scrolling:touch; justify-content:flex-start; padding:60px 0 30px; }
       .fullscreen-layout { flex-direction:column; gap:20px; align-items:center; }
       .fullscreen-stats-panel { width:300px; max-width:90vw; }
@@ -588,11 +590,11 @@
       /* Scale gallery cards down instead of changing dimensions, so content stays proportional */
       #cards-grid { gap:12px; padding:10px 10px 60px; }
       #cards-grid .card-wrapper { width:320px; height:480px; transform:scale(0.82); transform-origin:top center; margin-bottom:-86px; animation:cardEnterMobile 0.5s ease forwards; }
-      .reveal-area { gap:8px; padding:0 8px; flex-wrap:wrap; justify-content:center; }
+      .reveal-area { gap:8px; row-gap:36px; padding:0 8px; flex-wrap:wrap; justify-content:center; }
       .reveal-slot { width:calc(33.33% - 6px); max-width:130px; height:auto; aspect-ratio:190/293; flex-shrink:1; }
       .reveal-slot.hoverable:hover .reveal-card { transform:rotateY(0deg) scale(1.08) !important; }
       .pack-container { overflow-y:auto; max-height:100vh; max-height:100dvh; padding:10px 0; }
-      .fullscreen-card-container { width:240px; }
+      .fullscreen-card-container { width:320px; max-width:90vw; display:flex; justify-content:center; }
       .fullscreen-card-container .card-wrapper { width:320px; height:480px; transform:scale(0.72) !important; transform-origin:top center; margin-bottom:-134px; }
     }
     @keyframes cardEnterMobile { from { opacity:0; transform:scale(0.82) translateY(30px); } to { opacity:1; transform:scale(0.82) translateY(0); } }

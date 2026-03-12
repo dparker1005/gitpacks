@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cache, CACHE_TTL } from '../../cache';
+import { getCachedRepo, setCachedRepo } from '../../cache';
 
 // ===== Helpers =====
 function sleep(ms: number) {
@@ -508,9 +508,9 @@ export async function GET(
 
   // Check cache
   if (!refresh) {
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < CACHE_TTL) {
-      return NextResponse.json(cached.data);
+    const cached = await getCachedRepo(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
     }
   }
 
@@ -539,7 +539,7 @@ export async function GET(
     const result = processAllContributors(validStats, issueStats, extraContributors);
 
     // Cache result
-    cache.set(cacheKey, { ts: Date.now(), data: result });
+    await setCachedRepo(cacheKey, result);
 
     return NextResponse.json(result);
   } catch (err: any) {

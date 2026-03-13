@@ -1101,91 +1101,76 @@ function revealMilestonePack(cards) {
   function closePack() {
     packOpen = false;
     overlay.remove();
-    document.removeEventListener('keydown', escHandler);
+    document.removeEventListener('keydown', overlay._escHandler);
     if (_currentUser) loadLibraryFromDB().then(() => { renderRepoInfoFromCurrent(); renderLibrary(); });
   }
-  const escHandler = e => { if (e.code === 'Escape') closePack(); };
-  document.addEventListener('keydown', escHandler);
+  overlay._escHandler = e => { if (e.code === 'Escape') closePack(); };
+  document.addEventListener('keydown', overlay._escHandler);
   overlay.querySelector('#pack-close-btn').addEventListener('click', closePack);
 
-  // Custom onComplete: show "Next Achievement Pack" or "View Library"
-  revealCards(overlay, cards, () => {
-    // Override the default "Open Another" buttons after reveal
-    const existingBtns = overlay.querySelector('.reveal-buttons');
-    if (existingBtns) existingBtns.remove();
+  // Show cards and add achievement-specific buttons after reveal
+  function showPackInOverlay(packCards) {
+    revealCards(overlay, packCards, () => {
+      // Replace default buttons after a tick (revealCards adds its own)
+      setTimeout(() => {
+        overlay.querySelectorAll('.reveal-buttons').forEach(el => el.remove());
 
-    const remaining = getClaimableList();
-    const btnWrap = document.createElement('div');
-    btnWrap.className = 'reveal-buttons';
+        const remaining = getClaimableList();
+        const btnWrap = document.createElement('div');
+        btnWrap.className = 'reveal-buttons';
 
-    const doneBtn = document.createElement('button');
-    doneBtn.className = 'reveal-done-btn';
-    doneBtn.textContent = 'View Library';
-    doneBtn.onclick = closePack;
-    btnWrap.appendChild(doneBtn);
+        const doneBtn = document.createElement('button');
+        doneBtn.className = 'reveal-done-btn';
+        doneBtn.textContent = 'View Library';
+        doneBtn.onclick = closePack;
+        btnWrap.appendChild(doneBtn);
 
-    if (remaining.length > 0) {
-      const nextBtn = document.createElement('button');
-      nextBtn.className = 'reveal-another-btn';
-      nextBtn.textContent = `Next Achievement Pack (${remaining.length})`;
-      nextBtn.onclick = async () => {
-        if (nextBtn.disabled) return;
-        nextBtn.disabled = true;
-        const next = remaining[0];
-        const [ow, rp] = currentRepoName.split('/');
-        try {
-          const res = await fetch(`/api/achievements/${ow}/${rp}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(next),
-          });
-          if (!res.ok) { closePack(); return; }
-          const data = await res.json();
-          // Mark as claimed
-          if (lastAchievementData?.milestones?.[next.stat_type]) {
-            lastAchievementData.milestones[next.stat_type].claimed.push(next.threshold);
-            lastAchievementData.milestones[next.stat_type].claimable =
-              lastAchievementData.milestones[next.stat_type].claimable.filter(t => t !== next.threshold);
-          }
-          // Fade and show next pack
-          const container = overlay.querySelector('.pack-container');
-          container.style.transition = 'opacity 0.25s ease';
-          container.style.opacity = '0';
-          await new Promise(r => setTimeout(r, 300));
-          container.innerHTML = `<div class="reveal-area" id="reveal-area" style="display:flex"></div>`;
-          void container.offsetHeight;
-          container.style.opacity = '1';
-          revealCards(overlay, data.cards, () => {
-            const oldBtns = overlay.querySelector('.reveal-buttons');
-            if (oldBtns) oldBtns.remove();
-            const newRemaining = getClaimableList();
-            const newBtnWrap = document.createElement('div');
-            newBtnWrap.className = 'reveal-buttons';
-            const newDoneBtn = document.createElement('button');
-            newDoneBtn.className = 'reveal-done-btn';
-            newDoneBtn.textContent = 'View Library';
-            newDoneBtn.onclick = closePack;
-            newBtnWrap.appendChild(newDoneBtn);
-            if (newRemaining.length > 0) {
-              const newNextBtn = document.createElement('button');
-              newNextBtn.className = 'reveal-another-btn';
-              newNextBtn.textContent = `Next Achievement Pack (${newRemaining.length})`;
-              newNextBtn.onclick = nextBtn.onclick;
-              newBtnWrap.appendChild(newNextBtn);
-            }
-            overlay.querySelector('.pack-container').appendChild(newBtnWrap);
-          });
-        } catch { closePack(); }
-      };
-      btnWrap.appendChild(nextBtn);
+        if (remaining.length > 0) {
+          const nextBtn = document.createElement('button');
+          nextBtn.className = 'reveal-another-btn';
+          nextBtn.textContent = `Next Achievement Pack (${remaining.length})`;
+          nextBtn.onclick = async () => {
+            if (nextBtn.disabled) return;
+            nextBtn.disabled = true;
+            const next = remaining[0];
+            const [ow, rp] = currentRepoName.split('/');
+            try {
+              const res = await fetch(`/api/achievements/${ow}/${rp}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(next),
+              });
+              if (!res.ok) { closePack(); return; }
+              const data = await res.json();
+              if (lastAchievementData?.milestones?.[next.stat_type]) {
+                lastAchievementData.milestones[next.stat_type].claimed.push(next.threshold);
+                lastAchievementData.milestones[next.stat_type].claimable =
+                  lastAchievementData.milestones[next.stat_type].claimable.filter(t => t !== next.threshold);
+              }
+              // Fade out, reset, fade in, reveal next pack
+              const container = overlay.querySelector('.pack-container');
+              container.style.transition = 'opacity 0.25s ease';
+              container.style.opacity = '0';
+              await new Promise(r => setTimeout(r, 300));
+              container.innerHTML = `<div class="reveal-area" id="reveal-area" style="display:flex"></div>`;
+              void container.offsetHeight;
+              container.style.opacity = '1';
+              showPackInOverlay(data.cards);
+            } catch { closePack(); }
+          };
+          btnWrap.appendChild(nextBtn);
 
-      // Space to open next achievement pack
-      const achSpaceHandler = e => { if (e.code === 'Space') { e.preventDefault(); document.removeEventListener('keydown', achSpaceHandler); nextBtn.onclick(); } };
-      setTimeout(() => document.addEventListener('keydown', achSpaceHandler), 200);
-    }
+          // Space to open next
+          const spaceH = e => { if (e.code === 'Space') { e.preventDefault(); document.removeEventListener('keydown', spaceH); nextBtn.onclick(); } };
+          setTimeout(() => document.addEventListener('keydown', spaceH), 200);
+        }
 
-    overlay.querySelector('.pack-container').appendChild(btnWrap);
-  });
+        overlay.querySelector('.pack-container').appendChild(btnWrap);
+      }, 50);
+    });
+  }
+
+  showPackInOverlay(cards);
 }
 
 // ===== CLAIM ALL MILESTONES =====
@@ -1292,12 +1277,15 @@ async function claimAllMilestones() {
     if (cw) cw.style.transform = `scale(${cardScale})`;
   });
 
-  // Show all cards immediately (no stagger entrance for speed)
-  slots.forEach(s => { s.style.opacity = '1'; });
+  // Show all cards immediately
+  slots.forEach(s => { s.style.opacity = '1'; s.style.contain = 'layout style'; });
 
-  // Auto-flip: fast for commons, slower for rare+
+  // Clean up effects from earlier cards to keep DOM lean
+  function cleanupSlot(s) {
+    s.querySelectorAll('.leg-particles, .mythic-flash, .mythic-ring, .mythic-ring2, .mythic-ring3, .legendary-flash, .legendary-ring, .legendary-ring2, .epic-flash, .epic-ring, .rare-flash, .screen-flash').forEach(el => el.remove());
+  }
+
   let flipped = 0;
-  const container = overlay.querySelector('.claim-all-container');
 
   function flipNext() {
     if (flipped >= slots.length) {
@@ -1316,6 +1304,9 @@ async function claimAllMilestones() {
       return;
     }
 
+    // Clean up particles from cards that are 5+ behind (done animating)
+    if (flipped >= 5) cleanupSlot(slots[flipped - 5]);
+
     const slot = slots[flipped];
     const rarity = slot._rarity;
     const card = slot.querySelector('.reveal-card');
@@ -1323,19 +1314,40 @@ async function claimAllMilestones() {
     slot.classList.remove('unflipped');
     card.classList.add('flip-' + rarity);
 
-    // Glow (fast for common/rare)
-    const glowDelay = { common: 150, rare: 200, epic: 300, legendary: 400, mythic: 600 }[rarity] || 150;
+    const glowDelay = { common: 100, rare: 150, epic: 250, legendary: 350, mythic: 500 }[rarity] || 100;
     setTimeout(() => { if (rarity !== 'common') slot.classList.add('revealed'); }, glowDelay * 0.5);
 
-    // Only add effects for legendary+ (skip particles for epic/rare to reduce lag)
+    // Full effects for all rarities, but with reduced particle counts for performance
     if (rarity === 'mythic') {
       overlay.classList.add('shake-screen');
       setTimeout(() => overlay.classList.remove('shake-screen'), 400);
       slot.insertAdjacentHTML('beforeend', '<div class="mythic-flash"></div><div class="mythic-ring"></div>');
+      let particles = '<div class="leg-particles">';
+      const colors = ['#ff0040','#ff6600','#fff','#ff00ff'];
+      for (let i = 0; i < 16; i++) {
+        const angle = (Math.PI * 2 / 16) * i;
+        const dist = 80 + Math.random() * 100;
+        particles += `<div class="leg-particle" style="width:5px;height:5px;background:${colors[i%colors.length]};--px:${Math.cos(angle)*dist}px;--py:${Math.sin(angle)*dist}px;--pdur:${0.6+Math.random()*0.4}s;--pdelay:${Math.random()*0.15}s"></div>`;
+      }
+      particles += '</div>';
+      slot.insertAdjacentHTML('beforeend', particles);
     } else if (rarity === 'legendary') {
       overlay.classList.add('shake-screen');
       setTimeout(() => overlay.classList.remove('shake-screen'), 300);
       slot.insertAdjacentHTML('beforeend', '<div class="legendary-flash"></div><div class="legendary-ring"></div>');
+      let particles = '<div class="leg-particles">';
+      const colors = ['#ffd700','#ff6ec7','#fff'];
+      for (let i = 0; i < 10; i++) {
+        const angle = (Math.PI * 2 / 10) * i;
+        const dist = 60 + Math.random() * 80;
+        particles += `<div class="leg-particle" style="width:4px;height:4px;background:${colors[i%colors.length]};--px:${Math.cos(angle)*dist}px;--py:${Math.sin(angle)*dist}px;--pdur:${0.5+Math.random()*0.4}s;--pdelay:${Math.random()*0.1}s"></div>`;
+      }
+      particles += '</div>';
+      slot.insertAdjacentHTML('beforeend', particles);
+    } else if (rarity === 'epic') {
+      slot.insertAdjacentHTML('beforeend', '<div class="epic-flash"></div><div class="epic-ring"></div>');
+    } else if (rarity === 'rare') {
+      slot.insertAdjacentHTML('beforeend', '<div class="rare-flash"></div>');
     }
 
     if (slot._isNew) {
@@ -1345,17 +1357,15 @@ async function claimAllMilestones() {
     library[slot._contributor.login] = (library[slot._contributor.login] || 0) + 1;
     saveLibrary();
 
-    // Scroll to keep current card visible
     slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
     flipped++;
-    // Speed: commons zip by, rare+ get a moment
-    const delay = { common: 80, rare: 120, epic: 250, legendary: 500, mythic: 800 }[rarity] || 80;
+    const delay = { common: 60, rare: 100, epic: 200, legendary: 400, mythic: 700 }[rarity] || 60;
     setTimeout(flipNext, delay);
   }
 
   // Start immediately
-  setTimeout(flipNext, 300);
+  setTimeout(flipNext, 200);
 }
 
 window.claimMilestone = claimMilestone;

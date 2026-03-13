@@ -180,7 +180,8 @@ async function loadPopularRepos() {
 
     function repoBtn(r) {
       const pctNum = Math.round(r.pct * 100);
-      return `<button class="popular-repo-btn" data-repo="${r.name}">
+      const isComplete = r.cards > 0 && r.collected >= r.cards;
+      return `<button class="popular-repo-btn${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
           <span class="popular-repo-name">${r.name}</span>
           <span class="popular-repo-meta">
             <span class="popular-repo-progress">${r.collected}/${r.cards}</span>
@@ -430,12 +431,12 @@ function renderRepoInfo(owner, repo) {
     const stats = lastAchievementData.contributor;
     const milestones = lastAchievementData.milestones;
     const statLabels = {
-      commits: { label: 'Commits', icon: '\u{1F4BB}', value: stats.commits },
-      prs_merged: { label: 'PRs Merged', icon: '\u{1F500}', value: stats.prsMerged },
-      issues: { label: 'Issues', icon: '\u{1F41B}', value: stats.issues },
-      active_weeks: { label: 'Active Weeks', icon: '\u{1F4C5}', value: stats.activeWeeks },
-      streak: { label: 'Streak', icon: '\u{1F525}', value: stats.maxStreak },
-      peak_week: { label: 'Peak Week', icon: '\u{26A1}', value: stats.peak },
+      commits: { label: 'Commits', color: '#7873f5', value: stats.commits },
+      prs_merged: { label: 'PRs Merged', color: '#4ade80', value: stats.prsMerged },
+      issues: { label: 'Issues', color: '#f472b6', value: stats.issues },
+      active_weeks: { label: 'Active Weeks', color: '#4adede', value: stats.activeWeeks },
+      streak: { label: 'Streak', color: '#facc15', value: stats.maxStreak },
+      peak_week: { label: 'Peak Week', color: '#c084fc', value: stats.peak },
     };
     const milestoneDefClient = {
       commits: { fixed: [1,5,10,25,50,100,250], increment: 250, breakpoint: 1500, increment2: 500 },
@@ -453,17 +454,17 @@ function renderRepoInfo(owner, repo) {
 
       let markers = '';
 
-      // Claimed milestones (checkmark)
+      // Claimed milestones
       for (const t of m.claimed) {
-        markers += `<span class="ach-milestone claimed" title="Claimed: ${t}">\u2705 ${t}</span>`;
+        markers += `<span class="ach-milestone claimed" style="border-color:${info.color}40;color:${info.color}" title="Claimed: ${t}">${t}</span>`;
       }
 
-      // Claimable milestones (button)
+      // Claimable milestones
       for (const t of m.claimable) {
-        markers += `<button class="ach-milestone claimable" data-claim="${key}-${t}" title="Claim pack for reaching ${t}">\u{1F381} ${t}</button>`;
+        markers += `<button class="ach-milestone claimable" data-claim="${key}-${t}" title="Claim pack for reaching ${t}">${t}</button>`;
       }
 
-      // Next unearned milestone (grayed)
+      // Next unearned milestone
       const allEarned = [...m.claimed, ...m.claimable];
       const maxEarned = allEarned.length > 0 ? Math.max(...allEarned) : 0;
       const def = milestoneDefClient[key];
@@ -481,15 +482,15 @@ function renderRepoInfo(owner, repo) {
           nextTarget = t;
         }
         if (nextTarget) {
-          markers += `<span class="ach-milestone future" title="Next: ${nextTarget}">\u2B1C ${nextTarget}</span>`;
+          markers += `<span class="ach-milestone future">${nextTarget}</span>`;
         }
       }
 
       rows += `<div class="ach-row">
         <div class="ach-stat-info">
-          <span class="ach-icon">${info.icon}</span>
+          <span class="ach-dot" style="background:${info.color}"></span>
           <span class="ach-label">${info.label}</span>
-          <span class="ach-value">${info.value}</span>
+          <span class="ach-value" style="color:${info.color}">${info.value}</span>
         </div>
         <div class="ach-milestones">${markers}</div>
       </div>`;
@@ -505,7 +506,7 @@ function renderRepoInfo(owner, repo) {
     const packBadge = totalClaimable > 0 ? `<span class="ach-pack-badge">${totalClaimable} pack${totalClaimable !== 1 ? 's' : ''}</span>` : '';
 
     achievementHTML = `<div class="achievement-panel">
-      <div class="achievement-header">\u{1F3C6} Your Achievements ${packBadge}</div>
+      <div class="achievement-header">Your Achievements ${packBadge}</div>
       ${rows}
       ${claimAllBtn}
     </div>`;

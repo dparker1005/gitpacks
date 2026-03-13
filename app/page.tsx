@@ -66,7 +66,6 @@ export default function Home() {
   // Expose login for use by gitpacks.js (pack overlay sign-in button)
   useEffect(() => {
     (window as any).__gpLogin = handleLogin;
-    return () => { delete (window as any).__gpLogin; };
   });
 
   function handleLogout() {

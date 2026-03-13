@@ -61,6 +61,13 @@
     .user-name { font-family:'Orbitron',sans-serif; font-size:0.7rem; color:#aaa; letter-spacing:1px; }
     .user-menu .top-bar-btn { font-size:0.6rem; padding:8px 16px; }
 
+    /* === TOP BAR PACKS === */
+    .topbar-packs { display:flex; align-items:center; gap:6px; padding:6px 14px; border:1px solid rgba(120,115,245,0.2); border-radius:8px; background:rgba(120,115,245,0.06); }
+    .topbar-packs-icon { display:flex; align-items:center; }
+    .topbar-packs-icon svg { width:16px; height:16px; }
+    .topbar-packs-count { font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; color:#7873f5; letter-spacing:1px; }
+    .topbar-pack-timer { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#4adede; letter-spacing:0.5px; margin-left:4px; }
+
     /* === AUTH NUDGE === */
     .auth-nudge { text-align:center; padding:8px 16px; margin:8px auto 0; max-width:400px; border-radius:10px; background:rgba(120,115,245,0.06); border:1px solid rgba(120,115,245,0.12); color:#888; font-size:0.85rem; font-family:'Rajdhani',sans-serif; letter-spacing:0.5px; }
     .auth-nudge-icon { margin-right:6px; }

@@ -5,10 +5,8 @@ export function initGitPacks(user) {
 // Prevent double-init — just update user reference on re-calls
 if (_initialized) {
   _currentUser = user || null;
-  // Re-render repo info to update pack state / auth messaging
-  if (repoLoaded) {
-    loadPackState().then(() => renderRepoInfoFromCurrent());
-  }
+  // Load pack state for top bar, re-render repo info if loaded
+  loadPackState().then(() => { if (repoLoaded) renderRepoInfoFromCurrent(); });
   return;
 }
 _initialized = true;
@@ -60,20 +58,43 @@ function quickLoad(repo) { input.value = repo; loadRepo(); }
 
 // ===== PACK STATE =====
 async function loadPackState() {
-  if (!_currentUser) { packState = null; return; }
+  if (!_currentUser) { packState = null; renderTopBarPacks(); return; }
   try {
     const res = await fetch('/api/pack-state');
     if (res.ok) {
       packState = await res.json();
     }
   } catch { packState = null; }
+  renderTopBarPacks();
+}
+
+function renderTopBarPacks() {
+  const el = document.getElementById('top-bar-packs');
+  if (!el) return;
+  if (!_currentUser || !packState) { el.innerHTML = ''; return; }
+  const { readyPacks, maxPacks, nextRegenAt } = packState;
+  const timerHTML = readyPacks < maxPacks && nextRegenAt
+    ? `<span class="topbar-pack-timer" id="topbar-pack-timer"></span>`
+    : '';
+  el.innerHTML = `<div class="topbar-packs">
+    <span class="topbar-packs-icon">${GP_ICON}</span>
+    <span class="topbar-packs-count">${readyPacks}</span>
+    ${timerHTML}
+  </div>`;
+  if (readyPacks < maxPacks && nextRegenAt) startPackCountdown();
+}
+
+function formatCountdown(remaining) {
+  const h = Math.floor(remaining / 3600000);
+  const m = Math.floor((remaining % 3600000) / 60000);
+  const s = Math.floor((remaining % 60000) / 1000);
+  return `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
 }
 
 function startPackCountdown() {
   if (packCountdownInterval) clearInterval(packCountdownInterval);
   packCountdownInterval = setInterval(() => {
-    const el = document.getElementById('pack-countdown');
-    if (!el || !packState || !packState.nextRegenAt) {
+    if (!packState || !packState.nextRegenAt) {
       if (packCountdownInterval) clearInterval(packCountdownInterval);
       return;
     }
@@ -84,10 +105,12 @@ function startPackCountdown() {
       clearInterval(packCountdownInterval);
       return;
     }
-    const h = Math.floor(remaining / 3600000);
-    const m = Math.floor((remaining % 3600000) / 60000);
-    const s = Math.floor((remaining % 60000) / 1000);
-    el.textContent = `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
+    const timeStr = formatCountdown(remaining);
+    // Update both top bar and repo info countdowns
+    const topbarEl = document.getElementById('topbar-pack-timer');
+    if (topbarEl) topbarEl.textContent = timeStr;
+    const repoEl = document.getElementById('pack-countdown');
+    if (repoEl) repoEl.textContent = timeStr;
   }, 1000);
 }
 
@@ -164,6 +187,9 @@ async function loadPopularRepos() {
     });
   } catch { /* silent */ }
 }
+
+// Load pack state for top bar (logged-in users)
+if (_currentUser) loadPackState();
 
 // Auto-load from URL param, otherwise show repo browser
 const urlRepo = new URLSearchParams(window.location.search).get('repo');

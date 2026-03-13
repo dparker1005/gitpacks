@@ -82,6 +82,7 @@ export default function Home() {
           <button className="btn-share" id="share-btn">Share</button>
         </div>
         <div className="top-bar-right">
+          <div id="top-bar-packs"></div>
           {authLoading ? null : user ? (
             <div className="user-menu">
               <img src={user.avatar} alt="" className="user-avatar" />

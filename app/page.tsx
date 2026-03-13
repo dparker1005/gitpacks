@@ -69,6 +69,10 @@ export default function Home() {
   });
 
   function handleLogout() {
+    // Clear library localStorage cache so logged-out view doesn't show logged-in cards
+    Object.keys(localStorage).forEach(key => {
+      if (key.startsWith('ghtc_lib_')) localStorage.removeItem(key);
+    });
     const supabase = getSupabaseBrowser();
     supabase.auth.signOut().then(() => {
       window.location.reload();

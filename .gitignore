@@ -6,3 +6,5 @@ node_modules/
 out/
 *.tsbuildinfo
 next-env.d.ts
+.playwright-mcp/
+*.png

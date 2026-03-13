@@ -417,20 +417,21 @@ async function openPack() {
   }
 
   // Handle response: authenticated (cards + packState) or guest (cards + guestPacksRemaining)
+  // Don't update pack counts yet — wait until all cards are revealed
   let picks;
+  let pendingPackState = null;
+  let pendingGuestPacks = null;
   if (Array.isArray(data)) {
     picks = data;
   } else {
     picks = data.cards;
     if (data.packState) {
-      packState = data.packState;
+      pendingPackState = data.packState;
     }
     if (data.guestPacksRemaining !== undefined) {
-      guestPacksRemaining = data.guestPacksRemaining;
-      localStorage.setItem('gp_guest_packs_remaining', String(guestPacksRemaining));
+      pendingGuestPacks = data.guestPacksRemaining;
     }
   }
-  renderTopBarPacks();
 
   const overlay = document.createElement('div');
   overlay.className = 'pack-overlay';
@@ -466,7 +467,12 @@ async function openPack() {
     packWrapper.classList.add('tearing');
     instruction.style.display = 'none';
     overlay.querySelector('#pack-burst').innerHTML = '<div class="burst-ring"></div>';
-    setTimeout(() => { packWrapper.style.display = 'none'; revealCards(overlay, picks); }, 700);
+    setTimeout(() => { packWrapper.style.display = 'none'; revealCards(overlay, picks, function() {
+      // Apply pending pack state after all cards revealed
+      if (pendingPackState) { packState = pendingPackState; pendingPackState = null; }
+      if (pendingGuestPacks !== null) { guestPacksRemaining = pendingGuestPacks; localStorage.setItem('gp_guest_packs_remaining', String(guestPacksRemaining)); pendingGuestPacks = null; }
+      renderTopBarPacks();
+    }); }, 700);
     document.removeEventListener('keydown', packSpaceHandler);
   }
   packWrapper.addEventListener('click', tearPack);
@@ -488,7 +494,7 @@ async function openPack() {
   }
 }
 
-function revealCards(overlay, picks) {
+function revealCards(overlay, picks, onComplete) {
   const area = overlay.querySelector('#reveal-area');
   area.style.display = 'flex';
   const rarityOrder = { common:0, rare:1, epic:2, legendary:3, mythic:4 };
@@ -654,6 +660,7 @@ function revealCards(overlay, picks) {
     setTimeout(() => {
       if (flipped >= slots.length && !revealComplete) {
         revealComplete = true;
+        if (onComplete) onComplete();
         flipInstruction.remove();
         document.removeEventListener('keydown', spaceHandler);
 
@@ -679,15 +686,22 @@ function revealCards(overlay, picks) {
           // Fetch next pack while fading
           const [ow, rp] = currentRepoName.split('/');
           let nextPicks = null;
+          let nextPendingPackState = null;
+          let nextPendingGuestPacks = null;
           try {
             const res = await fetch(`/api/repo/${ow}/${rp}/pack`);
             if (res.ok) {
               const d = await res.json();
               if (Array.isArray(d)) { nextPicks = d; }
-              else { nextPicks = d.cards; if (d.packState) packState = d.packState; }
+              else {
+                nextPicks = d.cards;
+                if (d.packState) nextPendingPackState = d.packState;
+                if (d.guestPacksRemaining !== undefined) nextPendingGuestPacks = d.guestPacksRemaining;
+              }
             } else if (res.status === 429) {
               const errData = await res.json().catch(() => ({}));
               packState = { readyPacks: 0, maxPacks: 2, nextRegenAt: errData.nextRegenAt };
+              renderTopBarPacks();
             }
           } catch { /* handled below */ }
 
@@ -728,7 +742,11 @@ function revealCards(overlay, picks) {
             newWrapper.classList.add('tearing');
             newInstruction.style.display = 'none';
             container.querySelector('#pack-burst').innerHTML = '<div class="burst-ring"></div>';
-            setTimeout(() => { newWrapper.style.display = 'none'; revealCards(overlay, nextPicks); }, 700);
+            setTimeout(() => { newWrapper.style.display = 'none'; revealCards(overlay, nextPicks, function() {
+              if (nextPendingPackState) { packState = nextPendingPackState; nextPendingPackState = null; }
+              if (nextPendingGuestPacks !== null) { guestPacksRemaining = nextPendingGuestPacks; localStorage.setItem('gp_guest_packs_remaining', String(guestPacksRemaining)); nextPendingGuestPacks = null; }
+              renderTopBarPacks();
+            }); }, 700);
             document.removeEventListener('keydown', newSpaceHandler);
           }
           newWrapper.addEventListener('click', tearNewPack);

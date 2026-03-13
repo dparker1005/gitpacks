@@ -21,19 +21,21 @@ export async function GET() {
   if (!profile) {
     // Auto-create profile
     const meta = user.user_metadata || {};
-    await supabase.from('profiles').upsert({
+    const { error: upsertError } = await supabase.from('profiles').upsert({
       id: user.id,
       github_username: meta.user_name || meta.preferred_username || '',
       avatar_url: meta.avatar_url || '',
     }, { onConflict: 'id' });
-    const { data: newProfile } = await supabase
+    console.error('[pack-state] profile upsert for', user.id, 'error:', upsertError?.message || 'none');
+    const { data: newProfile, error: fetchError } = await supabase
       .from('profiles')
       .select('ready_packs, last_regen_at')
       .eq('id', user.id)
       .single();
+    console.error('[pack-state] profile re-fetch error:', fetchError?.message || 'none', 'data:', newProfile);
     profile = newProfile;
     if (!profile) {
-      return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create profile', detail: upsertError?.message }, { status: 500 });
     }
   }
 

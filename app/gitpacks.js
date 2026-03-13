@@ -189,38 +189,6 @@ async function loadPopularRepos() {
         </button>`;
     }
 
-    // For logged-in users, also fetch repos they contribute to on GitHub
-    let contributedRepos = [];
-    if (_currentUser) {
-      try {
-        const crRes = await fetch('/api/user-contributed-repos');
-        if (crRes.ok) contributedRepos = await crRes.json();
-      } catch { /* silent */ }
-    }
-
-    // Filter contributed repos: exclude ones already in user's collection
-    const collectedNames = new Set(yourRepos.map(r => r.name.toLowerCase()));
-    const newContributed = contributedRepos.filter(r => !collectedNames.has(r.name.toLowerCase()));
-
-    function contribBtn(r) {
-      if (r.cached) {
-        return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}">
-          <span class="popular-repo-name">${r.name}</span>
-          <span class="popular-repo-meta">
-            <span class="popular-repo-progress">0/${r.cards}</span>
-            <span class="popular-repo-pct">0%</span>
-          </span>
-        </button>`;
-      }
-      // Not cached yet — show loading indicator, will preload
-      return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}" data-preload="true">
-          <span class="popular-repo-name">${r.name}</span>
-          <span class="popular-repo-meta">
-            <span class="contrib-loading"><span class="spinner-small"></span></span>
-          </span>
-        </button>`;
-    }
-
     let html = '';
     if (yourRepos.length) {
       html += `<div class="popular-section">
@@ -228,11 +196,9 @@ async function loadPopularRepos() {
         <div class="popular-grid">${yourRepos.map(repoBtn).join('')}</div>
       </div>`;
     }
-    if (newContributed.length) {
-      html += `<div class="popular-section">
-        <h3 class="popular-title">Other Repos You Contribute To</h3>
-        <div class="popular-grid" id="contributed-grid">${newContributed.map(contribBtn).join('')}</div>
-      </div>`;
+    // Placeholder for contributed repos (lazy loaded)
+    if (_currentUser) {
+      html += `<div id="contributed-section"></div>`;
     }
     if (otherRepos.length) {
       html += `<div class="popular-section">
@@ -245,33 +211,87 @@ async function loadPopularRepos() {
       b.addEventListener('click', () => quickLoad(b.dataset.repo));
     });
 
-    // Preload uncached contributed repos in background
-    const toPreload = newContributed.filter(r => !r.cached);
-    for (const r of toPreload) {
-      const [ow, rp] = r.name.split('/');
-      if (!ow || !rp) continue;
-      fetch(`/api/repo/${ow}/${rp}`).then(async res => {
-        if (!res.ok) return;
-        const data = await res.json();
-        const cardCount = Array.isArray(data) ? data.length : 0;
-        // Update the button in place
-        const btn = popularRepos.querySelector(`[data-repo="${r.name}"][data-preload]`);
-        if (btn) {
-          btn.removeAttribute('data-preload');
-          const meta = btn.querySelector('.popular-repo-meta');
-          if (meta) meta.innerHTML = `<span class="popular-repo-progress">0/${cardCount}</span><span class="popular-repo-pct">0%</span>`;
-        }
-      }).catch(() => {
-        // Remove loading spinner on failure
-        const btn = popularRepos.querySelector(`[data-repo="${r.name}"][data-preload]`);
-        if (btn) {
-          btn.removeAttribute('data-preload');
-          const meta = btn.querySelector('.popular-repo-meta');
-          if (meta) meta.innerHTML = '';
-        }
-      });
+    // Lazy load contributed repos
+    if (_currentUser) {
+      loadContributedRepos(yourRepos);
     }
   } catch { /* silent */ }
+}
+
+async function loadContributedRepos(yourRepos) {
+  const section = document.getElementById('contributed-section');
+  if (!section) return;
+
+  // Show loading state
+  section.innerHTML = `<div class="popular-section">
+    <h3 class="popular-title">Other Repos You Contribute To</h3>
+    <div class="popular-grid"><div class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div></div>
+  </div>`;
+
+  let contributedRepos = [];
+  try {
+    const crRes = await fetch('/api/user-contributed-repos');
+    if (crRes.ok) contributedRepos = await crRes.json();
+  } catch { /* silent */ }
+
+  const collectedNames = new Set((yourRepos || []).map(r => r.name.toLowerCase()));
+  const newContributed = contributedRepos.filter(r => !collectedNames.has(r.name.toLowerCase()));
+
+  if (newContributed.length === 0) {
+    section.innerHTML = '';
+    return;
+  }
+
+  function contribBtn(r) {
+    if (r.cached) {
+      return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}">
+        <span class="popular-repo-name">${r.name}</span>
+        <span class="popular-repo-meta">
+          <span class="popular-repo-progress">0/${r.cards}</span>
+          <span class="popular-repo-pct">0%</span>
+        </span>
+      </button>`;
+    }
+    return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}" data-preload="true">
+        <span class="popular-repo-name">${r.name}</span>
+        <span class="popular-repo-meta">
+          <span class="contrib-loading"><span class="spinner-small"></span></span>
+        </span>
+      </button>`;
+  }
+
+  section.innerHTML = `<div class="popular-section">
+    <h3 class="popular-title">Other Repos You Contribute To</h3>
+    <div class="popular-grid">${newContributed.map(contribBtn).join('')}</div>
+  </div>`;
+
+  section.querySelectorAll('.popular-repo-btn').forEach(b => {
+    b.addEventListener('click', () => quickLoad(b.dataset.repo));
+  });
+
+  // Preload uncached repos in background
+  for (const r of newContributed.filter(r => !r.cached)) {
+    const [ow, rp] = r.name.split('/');
+    if (!ow || !rp) continue;
+    fetch(`/api/repo/${ow}/${rp}`).then(async res => {
+      if (!res.ok) return;
+      const data = await res.json();
+      const cardCount = Array.isArray(data) ? data.length : 0;
+      const btn = section.querySelector(`[data-repo="${r.name}"][data-preload]`);
+      if (btn) {
+        btn.removeAttribute('data-preload');
+        const meta = btn.querySelector('.popular-repo-meta');
+        if (meta) meta.innerHTML = `<span class="popular-repo-progress">0/${cardCount}</span><span class="popular-repo-pct">0%</span>`;
+      }
+    }).catch(() => {
+      const btn = section.querySelector(`[data-repo="${r.name}"][data-preload]`);
+      if (btn) {
+        btn.removeAttribute('data-preload');
+        const meta = btn.querySelector('.popular-repo-meta');
+        if (meta) meta.innerHTML = '';
+      }
+    });
+  }
 }
 
 // Load pack state for top bar (all users)

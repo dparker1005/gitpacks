@@ -259,7 +259,7 @@ export async function GET(
     packs_since_mythic: gotMythic ? 0 : packsSinceMythic + 1,
   };
 
-  await supabase
+  const { error: pityErr } = await supabase
     .from('user_packs')
     .upsert(newPityData, { onConflict: 'user_id, owner_repo' });
 
@@ -273,12 +273,13 @@ export async function GET(
   } else {
     regenUpdate.last_regen_at = new Date(lastRegenAt).toISOString();
   }
-  await supabase
+  const { error: profileErr } = await supabase
     .from('profiles')
     .update(regenUpdate)
     .eq('id', user.id);
 
   // 8. Save cards to collection
+  const saveErrors: string[] = [];
   for (const card of cards) {
     const { data: existing } = await supabase
       .from('user_collections')
@@ -289,21 +290,29 @@ export async function GET(
       .single();
 
     if (existing) {
-      await supabase
+      const { error: updErr } = await supabase
         .from('user_collections')
         .update({ count: existing.count + 1 })
         .eq('user_id', user.id)
         .eq('owner_repo', cacheKey)
         .eq('contributor_login', card.login);
+      if (updErr) saveErrors.push(`update ${card.login}: ${updErr.message}`);
     } else {
-      await supabase
+      const { error: insErr } = await supabase
         .from('user_collections')
         .insert({ user_id: user.id, owner_repo: cacheKey, contributor_login: card.login, count: 1 });
+      if (insErr) saveErrors.push(`insert ${card.login}: ${insErr.message}`);
     }
   }
 
-  // Return cards + pack state
+  // Return cards + pack state + any save errors for debugging
   const nextRegenAt = readyPacks < MAX_PACKS ? lastRegenAt + REGEN_INTERVAL_MS : null;
+  const dbErrors = [
+    pityErr ? `pity: ${pityErr.message}` : null,
+    profileErr ? `profile: ${profileErr.message}` : null,
+    ...saveErrors,
+  ].filter(Boolean);
+
   return NextResponse.json({
     cards,
     packState: {
@@ -311,5 +320,6 @@ export async function GET(
       maxPacks: MAX_PACKS,
       nextRegenAt,
     },
+    ...(dbErrors.length > 0 ? { _dbErrors: dbErrors } : {}),
   });
 }

@@ -593,6 +593,7 @@
     .ghost-card:hover { opacity:0.5 !important; }
     .ghost-card .card::before, .ghost-card .card::after { display:none; }
     .ghost-card .card-sparkles { display:none; }
+    .ghost-card .rarity-badge { filter:grayscale(0); opacity:1; }
     /* Pause all animations and effects on offscreen cards */
     .offscreen .card, .offscreen .card *, .offscreen .card::before, .offscreen .card::after, .offscreen .card-inner::before { animation-play-state:paused !important; }
     .offscreen .card::after { display:none; }

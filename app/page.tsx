@@ -101,7 +101,7 @@ export default function Home() {
           )}
         </div>
       </div>
-      <header>
+      <header style={{ cursor: 'pointer' }} onClick={() => { window.location.href = window.location.pathname; }}>
         <h1>
           <svg viewBox="0 0 32 32">
             <defs>

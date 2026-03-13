@@ -588,12 +588,12 @@
 
     .card-wrapper:hover .card { z-index:10; }
     .card-wrapper.clickable { cursor:pointer; }
-    .ghost-card { opacity:0.25 !important; filter:grayscale(1); cursor:pointer; transition:opacity 0.3s, filter 0.3s; animation:none !important; transform:none !important; }
-    .ghost-card .card { filter:grayscale(1); }
-    .ghost-card:hover { opacity:0.5 !important; }
+    .ghost-card { opacity:1 !important; cursor:pointer; transition:opacity 0.3s; animation:none !important; transform:none !important; }
+    .ghost-card .card { filter:grayscale(1) brightness(0.3); transition:filter 0.3s; }
+    .ghost-card:hover .card { filter:grayscale(0.8) brightness(0.5); }
     .ghost-card .card::before, .ghost-card .card::after { display:none; }
     .ghost-card .card-sparkles { display:none; }
-    .ghost-card .rarity-badge { filter:grayscale(0); opacity:1; }
+    .ghost-card .rarity-badge { filter:grayscale(0) brightness(2); }
     /* Pause all animations and effects on offscreen cards */
     .offscreen .card, .offscreen .card *, .offscreen .card::before, .offscreen .card::after, .offscreen .card-inner::before { animation-play-state:paused !important; }
     .offscreen .card::after { display:none; }

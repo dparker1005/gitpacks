@@ -1178,40 +1178,7 @@ async function claimAllMilestones() {
   const claimable = getClaimableList();
   if (claimable.length === 0) return;
 
-  const claimAllBtn = document.getElementById('ach-claim-all');
-  if (claimAllBtn) { claimAllBtn.disabled = true; claimAllBtn.textContent = 'Opening packs...'; }
-
-  // Single API call to claim all milestones
-  const [owner, repo] = currentRepoName.split('/');
-  let allCards = [];
-  try {
-    const res = await fetch(`/api/achievements/${owner}/${repo}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ claim_all: true }),
-    });
-    if (!res.ok) { if (claimAllBtn) { claimAllBtn.disabled = false; claimAllBtn.textContent = 'Open All'; } return; }
-    const data = await res.json();
-    allCards = data.cards || [];
-    // Mark all as claimed locally
-    if (data.milestones && lastAchievementData?.milestones) {
-      for (const m of data.milestones) {
-        const ms = lastAchievementData.milestones[m.stat_type];
-        if (ms) { ms.claimed.push(m.threshold); ms.claimable = ms.claimable.filter(t => t !== m.threshold); }
-      }
-    }
-  } catch { if (claimAllBtn) { claimAllBtn.disabled = false; claimAllBtn.textContent = 'Open All'; } return; }
-
-  renderRepoInfoFromCurrent();
-  if (allCards.length === 0) return;
-
-  // Sort: common first, mythic last
-  const rarityOrder = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
-  allCards.sort((a, b) => (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0));
-
-  // Track which logins we've already seen (for NEW badge deduplication)
-  const seenLogins = new Set(Object.keys(library));
-
+  // Show overlay with loading spinner immediately to block other interactions
   packOpen = true;
   const overlay = document.createElement('div');
   overlay.className = 'pack-overlay';
@@ -1219,7 +1186,8 @@ async function claimAllMilestones() {
     <button class="pack-close-btn" id="pack-close-btn">&times;</button>
     <div class="pack-container claim-all-container">
       <div class="claim-all-header">${claimable.length} Achievement Pack${claimable.length !== 1 ? 's' : ''}</div>
-      <div class="reveal-area claim-all-area no-card-effects" id="reveal-area" style="display:flex"></div>
+      <div class="claim-all-loading"><div class="spinner"></div><p>Opening ${claimable.length} pack${claimable.length !== 1 ? 's' : ''}...</p></div>
+      <div class="reveal-area claim-all-area no-card-effects" id="reveal-area" style="display:flex;display:none"></div>
     </div>`;
   document.body.appendChild(overlay);
 
@@ -1233,7 +1201,40 @@ async function claimAllMilestones() {
   document.addEventListener('keydown', escHandler);
   overlay.querySelector('#pack-close-btn').addEventListener('click', closePack);
 
+  // Fetch all cards
+  const [owner, repo] = currentRepoName.split('/');
+  let allCards = [];
+  try {
+    const res = await fetch(`/api/achievements/${owner}/${repo}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ claim_all: true }),
+    });
+    if (!res.ok) { closePack(); return; }
+    const data = await res.json();
+    allCards = data.cards || [];
+    if (data.milestones && lastAchievementData?.milestones) {
+      for (const m of data.milestones) {
+        const ms = lastAchievementData.milestones[m.stat_type];
+        if (ms) { ms.claimed.push(m.threshold); ms.claimable = ms.claimable.filter(t => t !== m.threshold); }
+      }
+    }
+  } catch { closePack(); return; }
+
+  renderRepoInfoFromCurrent();
+  if (allCards.length === 0) { closePack(); return; }
+
+  // Hide loading, show reveal area
+  const loadingEl = overlay.querySelector('.claim-all-loading');
+  if (loadingEl) loadingEl.remove();
   const area = overlay.querySelector('#reveal-area');
+  area.style.display = 'flex';
+
+  // Sort: common first, mythic last
+  const rarityOrder = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
+  allCards.sort((a, b) => (rarityOrder[a.rarity] || 0) - (rarityOrder[b.rarity] || 0));
+
+  const seenLogins = new Set(Object.keys(library));
   const slots = [];
 
   allCards.forEach((c) => {
@@ -1278,20 +1279,26 @@ async function claimAllMilestones() {
   });
 
   // Show all cards immediately
-  slots.forEach(s => { s.style.opacity = '1'; s.style.contain = 'layout style'; });
-
-  // Clean up effects from earlier cards to keep DOM lean
-  function cleanupSlot(s) {
-    s.querySelectorAll('.leg-particles, .mythic-flash, .mythic-ring, .mythic-ring2, .mythic-ring3, .legendary-flash, .legendary-ring, .legendary-ring2, .epic-flash, .epic-ring, .rare-flash, .screen-flash').forEach(el => el.remove());
-  }
+  slots.forEach(s => { s.style.opacity = '1'; });
 
   let flipped = 0;
 
-  // Phase 1: Flip all cards quickly with NO particles (smooth performance)
   function flipNext() {
     if (flipped >= slots.length) {
-      // Phase 2: All flipped — now add effects to rare+ cards
-      addEffectsPass();
+      // All done — re-enable card shimmer and show buttons
+      area.classList.remove('no-card-effects');
+      const btnWrap = document.createElement('div');
+      btnWrap.className = 'reveal-buttons';
+      const doneBtn = document.createElement('button');
+      doneBtn.className = 'reveal-done-btn';
+      doneBtn.textContent = 'View Library';
+      doneBtn.onclick = closePack;
+      btnWrap.appendChild(doneBtn);
+      overlay.querySelector('.pack-container').appendChild(btnWrap);
+      slots.forEach(s => {
+        s.classList.add('hoverable');
+        s.addEventListener('click', () => { if (s._contributor) openFullscreenCard(s._contributor); });
+      });
       return;
     }
 
@@ -1318,79 +1325,6 @@ async function claimAllMilestones() {
     flipped++;
     const delay = { common: 50, rare: 80, epic: 150, legendary: 300, mythic: 500 }[rarity] || 50;
     setTimeout(flipNext, delay);
-  }
-
-  // Phase 2: Add particle effects after all cards are flipped
-  function addEffectsPass() {
-    const effectSlots = slots.filter(s => s._rarity === 'legendary' || s._rarity === 'mythic');
-
-    // If no legendary/mythic, just remove the effects lock and show buttons
-    if (effectSlots.length === 0) {
-      area.classList.remove('no-card-effects');
-    }
-
-    let idx = 0;
-    function addNextEffect() {
-      if (idx >= effectSlots.length) {
-        // All effects done — re-enable card shimmer/sparkles for all cards
-        area.classList.remove('no-card-effects');
-        // Done — show buttons
-        const btnWrap = document.createElement('div');
-        btnWrap.className = 'reveal-buttons';
-        const doneBtn = document.createElement('button');
-        doneBtn.className = 'reveal-done-btn';
-        doneBtn.textContent = 'View Library';
-        doneBtn.onclick = closePack;
-        btnWrap.appendChild(doneBtn);
-        overlay.querySelector('.pack-container').appendChild(btnWrap);
-        slots.forEach(s => {
-          s.classList.add('hoverable');
-          s.addEventListener('click', () => { if (s._contributor) openFullscreenCard(s._contributor); });
-        });
-        return;
-      }
-
-      const slot = effectSlots[idx];
-      const rarity = slot._rarity;
-
-      slot.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-      if (rarity === 'mythic') {
-        overlay.classList.add('shake-screen');
-        setTimeout(() => overlay.classList.remove('shake-screen'), 500);
-        slot.insertAdjacentHTML('beforeend', '<div class="mythic-flash"></div><div class="mythic-ring"></div>');
-        let particles = '<div class="leg-particles">';
-        const colors = ['#ff0040','#ff6600','#fff','#ff00ff'];
-        for (let i = 0; i < 16; i++) {
-          const angle = (Math.PI * 2 / 16) * i;
-          const dist = 80 + Math.random() * 100;
-          particles += `<div class="leg-particle" style="width:5px;height:5px;background:${colors[i%colors.length]};--px:${Math.cos(angle)*dist}px;--py:${Math.sin(angle)*dist}px;--pdur:${0.6+Math.random()*0.4}s;--pdelay:${Math.random()*0.15}s"></div>`;
-        }
-        particles += '</div>';
-        slot.insertAdjacentHTML('beforeend', particles);
-      } else if (rarity === 'legendary') {
-        overlay.classList.add('shake-screen');
-        setTimeout(() => overlay.classList.remove('shake-screen'), 400);
-        slot.insertAdjacentHTML('beforeend', '<div class="legendary-flash"></div><div class="legendary-ring"></div>');
-        let particles = '<div class="leg-particles">';
-        const colors = ['#ffd700','#ff6ec7','#fff'];
-        for (let i = 0; i < 10; i++) {
-          const angle = (Math.PI * 2 / 10) * i;
-          const dist = 60 + Math.random() * 80;
-          particles += `<div class="leg-particle" style="width:4px;height:4px;background:${colors[i%colors.length]};--px:${Math.cos(angle)*dist}px;--py:${Math.sin(angle)*dist}px;--pdur:${0.5+Math.random()*0.4}s;--pdelay:${Math.random()*0.1}s"></div>`;
-        }
-        particles += '</div>';
-        slot.insertAdjacentHTML('beforeend', particles);
-      }
-
-      idx++;
-      // Clean up previous effect slot's particles
-      if (idx >= 2) cleanupSlot(effectSlots[idx - 2]);
-      setTimeout(addNextEffect, rarity === 'mythic' ? 800 : 500);
-    }
-
-    // Small pause before the effects celebration
-    setTimeout(addNextEffect, 400);
   }
 
   // Start flipping immediately

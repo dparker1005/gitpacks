@@ -503,7 +503,7 @@ function renderRepoInfo(owner, repo) {
       peak_week: { label: 'Peak Week', color: '#c084fc', value: stats.peak },
     };
     const milestoneDefClient = {
-      commits: { fixed: [1,5,10,25,50,100,250], increment: 250, breakpoint: 1500, increment2: 500 },
+      commits: { fixed: [1,10,50,100,500], increment: 0 },
       prs_merged: { fixed: [1,5,10,25,50,100], increment: 50, breakpoint: 500, increment2: 100 },
       issues: { fixed: [1,5,10,25,50], increment: 25 },
       active_weeks: { fixed: [1,4,12,26,52], increment: 26, breakpoint: 104, increment2: 52 },

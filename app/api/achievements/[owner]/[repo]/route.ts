@@ -15,7 +15,7 @@ interface Contributor {
 }
 
 const MILESTONE_DEFS: Record<string, { fixed: number[]; increment: number; breakpoint?: number; increment2?: number; statKey: string }> = {
-  commits:      { fixed: [1, 5, 10, 25, 50, 100, 250],  increment: 250, breakpoint: 1500, increment2: 500, statKey: 'commits' },
+  commits:      { fixed: [1, 10, 50, 100, 500],  increment: 0, statKey: 'commits' },
   prs_merged:   { fixed: [1, 5, 10, 25, 50, 100],     increment: 50,  breakpoint: 500,  increment2: 100, statKey: 'prsMerged' },
   issues:       { fixed: [1, 5, 10, 25, 50],            increment: 25,  statKey: 'issues' },
   active_weeks: { fixed: [1, 4, 12, 26, 52],     increment: 26,  breakpoint: 104,  increment2: 52,  statKey: 'activeWeeks' },

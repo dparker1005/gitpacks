@@ -437,6 +437,7 @@ function renderRepoInfo(owner, repo) {
   if (_currentUser && lastAchievementData && lastAchievementData.isContributor) {
     const stats = lastAchievementData.contributor;
     const milestones = lastAchievementData.milestones;
+    const maxPerStat = lastAchievementData.maxPerStat || 8;
     const statLabels = {
       commits: { label: 'Commits', color: '#7873f5', value: stats.commits },
       prs_merged: { label: 'PRs Merged', color: '#4ade80', value: stats.prsMerged },
@@ -454,44 +455,60 @@ function renderRepoInfo(owner, repo) {
       peak_week: { fixed: [1,3,5,10,20], increment: 10 },
     };
 
+    // Compute all thresholds for each stat (up to 8) to show the full grid
+    function getAllThresholds(def, maxSlots) {
+      const all = [...def.fixed];
+      if (all.length > 0) {
+        let next = all[all.length - 1] + def.increment;
+        while (all.length < maxSlots) {
+          all.push(next);
+          const inc = (def.breakpoint && def.increment2 && next >= def.breakpoint) ? def.increment2 : def.increment;
+          next += inc;
+        }
+      }
+      return all.slice(0, maxSlots);
+    }
+
     let rows = '';
+    let totalClaimable = 0;
+
     for (const [key, info] of Object.entries(statLabels)) {
       const m = milestones[key];
       if (!m) continue;
 
-      let markers = '';
-
-      // Claimed milestones
-      for (const t of m.claimed) {
-        markers += `<span class="ach-milestone claimed" style="border-color:${info.color}40;color:${info.color}" title="Claimed: ${t}">${t}</span>`;
-      }
-
-      // Claimable milestones
-      for (const t of m.claimable) {
-        markers += `<button class="ach-milestone claimable" data-claim="${key}-${t}" title="Claim pack for reaching ${t}">${t}</button>`;
-      }
-
-      // Next unearned milestone
-      const allEarned = [...m.claimed, ...m.claimable];
-      const maxEarned = allEarned.length > 0 ? Math.max(...allEarned) : 0;
       const def = milestoneDefClient[key];
-      if (def) {
-        let nextTarget = null;
-        for (const t of def.fixed) {
-          if (t > maxEarned && t > info.value) { nextTarget = t; break; }
+      const allThresholds = getAllThresholds(def, 8);
+      const claimedSet = new Set(m.claimed);
+      const claimableSet = new Set(m.claimable);
+      const lockedSet = new Set(m.locked || []);
+
+      let slots = '';
+      allThresholds.forEach((t, i) => {
+        const slotNum = i + 1;
+        const isLocked = slotNum > maxPerStat;
+        const isClaimed = claimedSet.has(t);
+        const isClaimable = claimableSet.has(t);
+        const isEarned = info.value >= t;
+
+        if (isLocked) {
+          slots += `<span class="ach-slot locked" title="Unlock with larger repo (need ${[1,10,20,30,50,75,100,128][i] || '?'}+ cards)">
+            <span class="ach-slot-lock">&#x1f512;</span>
+          </span>`;
+        } else if (isClaimed) {
+          slots += `<span class="ach-slot claimed" style="border-color:${info.color}40" title="Claimed: ${t}">
+            <span class="ach-slot-val" style="color:${info.color}">${t}</span>
+          </span>`;
+        } else if (isClaimable) {
+          totalClaimable++;
+          slots += `<button class="ach-slot claimable" data-claim="${key}-${t}" title="Claim pack for reaching ${t}">
+            <span class="ach-slot-val">${t}</span>
+          </button>`;
+        } else if (!isEarned) {
+          slots += `<span class="ach-slot unearned" title="Reach ${t} to unlock">
+            <span class="ach-slot-val">${t}</span>
+          </span>`;
         }
-        if (!nextTarget && def.fixed.length > 0) {
-          let t = def.fixed[def.fixed.length - 1] + def.increment;
-          while (t <= maxEarned || t <= info.value) {
-            const inc = (def.breakpoint && def.increment2 && t >= def.breakpoint) ? def.increment2 : def.increment;
-            t += inc;
-          }
-          nextTarget = t;
-        }
-        if (nextTarget) {
-          markers += `<span class="ach-milestone future">${nextTarget}</span>`;
-        }
-      }
+      });
 
       rows += `<div class="ach-row">
         <div class="ach-stat-info">
@@ -499,21 +516,16 @@ function renderRepoInfo(owner, repo) {
           <span class="ach-label">${info.label}</span>
           <span class="ach-value" style="color:${info.color}">${info.value}</span>
         </div>
-        <div class="ach-milestones">${markers}</div>
+        <div class="ach-slots">${slots}</div>
       </div>`;
-    }
-
-    // Count total claimable packs
-    let totalClaimable = 0;
-    for (const m of Object.values(milestones)) {
-      totalClaimable += m.claimable.length;
     }
 
     const claimAllBtn = totalClaimable > 1 ? `<button class="ach-claim-all" id="ach-claim-all">Open All (${totalClaimable} packs)</button>` : '';
     const packBadge = totalClaimable > 0 ? `<span class="ach-pack-badge">${totalClaimable} pack${totalClaimable !== 1 ? 's' : ''}</span>` : '';
+    const slotsLabel = `<span class="ach-slots-label">${maxPerStat}/8 slots</span>`;
 
     achievementHTML = `<div class="achievement-panel">
-      <div class="achievement-header">Your Achievements ${packBadge}</div>
+      <div class="achievement-header">Your Achievements ${packBadge} ${slotsLabel}</div>
       ${rows}
       ${claimAllBtn}
     </div>`;

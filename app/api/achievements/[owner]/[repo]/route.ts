@@ -23,6 +23,17 @@ const MILESTONE_DEFS: Record<string, { fixed: number[]; increment: number; break
   peak_week:    { fixed: [1, 3, 5, 10, 20],      increment: 10,  statKey: 'peak' },
 };
 
+// Per-stat milestone cap based on repo card count
+const REPO_SIZE_TIERS = [1, 10, 20, 30, 50, 75, 100, 128];
+function getMaxMilestonesPerStat(cardCount: number): number {
+  let cap = 0;
+  for (const tier of REPO_SIZE_TIERS) {
+    if (cardCount >= tier) cap++;
+    else break;
+  }
+  return cap;
+}
+
 function getEarnedThresholds(statValue: number, def: { fixed: number[]; increment: number; breakpoint?: number; increment2?: number }): number[] {
   const { fixed, increment, breakpoint, increment2 } = def;
   const thresholds: number[] = [];
@@ -229,13 +240,18 @@ export async function GET(
       selfCard = contributor;
     }
 
-    // --- Compute milestones (read-only, no inserts) ---
-    const milestones: Record<string, { earned: number[]; claimed: number[]; claimable: number[] }> = {};
+    // --- Compute milestones with per-stat cap ---
+    const cardCount = allContributors.length;
+    const maxPerStat = getMaxMilestonesPerStat(cardCount);
+    const milestones: Record<string, { earned: number[]; claimed: number[]; claimable: number[]; locked: number[]; maxSlots: number }> = {};
 
     for (const [statType, def] of Object.entries(MILESTONE_DEFS)) {
       const statValue = (contributor as any)[def.statKey] ?? 0;
-      const earned = getEarnedThresholds(statValue, def);
-      milestones[statType] = { earned, claimed: [], claimable: [] };
+      const allEarned = getEarnedThresholds(statValue, def);
+      // Only the first maxPerStat earned milestones are available
+      const available = allEarned.slice(0, maxPerStat);
+      const locked = allEarned.slice(maxPerStat);
+      milestones[statType] = { earned: available, claimed: [], claimable: [], locked, maxSlots: maxPerStat };
     }
 
     // Query existing achievements for this user+repo
@@ -272,6 +288,8 @@ export async function GET(
         peak: contributor.peak,
       },
       milestones,
+      maxPerStat,
+      cardCount,
     });
   } catch (e: any) {
     return NextResponse.json({ error: 'Unexpected error', detail: e?.message }, { status: 500 });
@@ -329,11 +347,12 @@ export async function POST(
       return NextResponse.json({ error: 'Not a contributor to this repo' }, { status: 403 });
     }
 
-    // Determine if batch or single claim
+    // Determine if batch or single claim (with per-stat cap)
+    const cardCount = allContributors.length;
+    const maxPerStat = getMaxMilestonesPerStat(cardCount);
     let milestonesToClaim: { stat_type: string; threshold: number }[] = [];
 
     if (body.claim_all) {
-      // Get all existing achievements
       const { data: existingAchievements } = await supabase
         .from('user_achievements')
         .select('stat_type, threshold')
@@ -346,7 +365,7 @@ export async function POST(
 
       for (const [statType, def] of Object.entries(MILESTONE_DEFS)) {
         const statValue = (contributor as any)[def.statKey] ?? 0;
-        const earned = getEarnedThresholds(statValue, def);
+        const earned = getEarnedThresholds(statValue, def).slice(0, maxPerStat);
         for (const t of earned) {
           if (!claimedSet.has(`${statType}:${t}`)) {
             milestonesToClaim.push({ stat_type: statType, threshold: t });
@@ -364,9 +383,9 @@ export async function POST(
         return NextResponse.json({ error: 'Invalid stat_type' }, { status: 400 });
       }
       const statValue = (contributor as any)[def.statKey] ?? 0;
-      const earned = getEarnedThresholds(statValue, def);
+      const earned = getEarnedThresholds(statValue, def).slice(0, maxPerStat);
       if (!earned.includes(threshold)) {
-        return NextResponse.json({ error: 'Milestone not earned' }, { status: 403 });
+        return NextResponse.json({ error: 'Milestone not earned or locked' }, { status: 403 });
       }
       milestonesToClaim = [{ stat_type, threshold }];
     }

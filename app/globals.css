@@ -705,20 +705,26 @@
     .claim-all-area.no-card-effects .card-holo { animation:none !important; opacity:0 !important; }
     .claim-all-area.no-card-effects .card-rainbow { animation:none !important; opacity:0 !important; }
     .claim-all-area.no-card-effects .card::after { animation:none !important; }
-    .ach-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.03); }
+    .ach-row { display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.03); }
     .ach-row:last-child { border-bottom:none; }
     .ach-stat-info { display:flex; align-items:center; gap:6px; min-width:120px; flex-shrink:0; }
     .ach-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
     .ach-label { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#777; }
     .ach-value { font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; }
-    .ach-milestones { display:flex; align-items:center; gap:3px; flex-wrap:wrap; margin-left:auto; }
-    .ach-milestone { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; padding:2px 6px; border-radius:3px; white-space:nowrap; letter-spacing:0.3px; }
-    .ach-milestone.claimed { background:rgba(255,255,255,0.05); color:#666; border:1px solid rgba(255,255,255,0.08); text-decoration:line-through; text-decoration-color:rgba(255,255,255,0.15); }
-    .ach-milestone.claimable { background:linear-gradient(135deg,rgba(120,115,245,0.3),rgba(74,222,222,0.3)); color:#fff; border:1px solid rgba(120,115,245,0.6); cursor:pointer; transition:all 0.2s; animation:claimPulse 1.5s ease-in-out infinite; box-shadow:0 0 8px rgba(120,115,245,0.3); }
-    .ach-milestone.claimable:hover { background:linear-gradient(135deg,rgba(120,115,245,0.5),rgba(74,222,222,0.5)); border-color:#7873f5; transform:translateY(-1px); box-shadow:0 2px 14px rgba(120,115,245,0.5); }
-    .ach-milestone.claimable:disabled { opacity:0.5; cursor:default; transform:none; box-shadow:none; animation:none; }
-    .ach-milestone.future { background:transparent; color:#333; border:1px dashed rgba(255,255,255,0.08); }
-    @keyframes claimPulse { 0%,100% { box-shadow:0 0 8px rgba(120,115,245,0.3); } 50% { box-shadow:0 0 18px rgba(120,115,245,0.6), 0 0 30px rgba(74,222,222,0.2); } }
+    .ach-slots { display:flex; align-items:center; gap:3px; margin-left:auto; }
+    .ach-slots-label { font-family:'Rajdhani',sans-serif; font-size:0.7rem; color:#555; margin-left:auto; }
+    .ach-slot { display:flex; align-items:center; justify-content:center; width:32px; height:24px; border-radius:4px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; border:1px solid rgba(255,255,255,0.06); }
+    .ach-slot-val { letter-spacing:0.3px; }
+    .ach-slot-lock { font-size:0.55rem; opacity:0.4; }
+    .ach-slot.claimed { background:rgba(255,255,255,0.04); }
+    .ach-slot.claimed .ach-slot-val { opacity:0.7; }
+    .ach-slot.claimable { background:linear-gradient(135deg,rgba(120,115,245,0.25),rgba(74,222,222,0.25)); color:#fff; border:1px solid rgba(120,115,245,0.5); cursor:pointer; transition:all 0.2s; animation:claimPulse 1.5s ease-in-out infinite; }
+    .ach-slot.claimable:hover { border-color:#7873f5; transform:translateY(-1px); box-shadow:0 2px 12px rgba(120,115,245,0.5); }
+    .ach-slot.claimable:disabled { opacity:0.5; cursor:default; transform:none; box-shadow:none; animation:none; }
+    .ach-slot.unearned { border-style:dashed; }
+    .ach-slot.unearned .ach-slot-val { color:#333; }
+    .ach-slot.locked { background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.04); }
+    @keyframes claimPulse { 0%,100% { box-shadow:0 0 6px rgba(120,115,245,0.2); } 50% { box-shadow:0 0 14px rgba(120,115,245,0.5), 0 0 24px rgba(74,222,222,0.15); } }
 
     @media (max-width:600px) {
       .self-card-message { font-size:1.1rem; letter-spacing:2px; }

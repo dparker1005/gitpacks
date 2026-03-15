@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { getCachedRepo } from '@/app/lib/repo-cache';
 import { redirect } from 'next/navigation';
+import CardImage from './CardImage';
 
 interface Params {
   owner: string;
@@ -14,8 +15,8 @@ export async function generateMetadata({
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { owner, repo, login } = await params;
-  const ogUrl = `https://gitpacks.vercel.app/api/card/${owner}/${repo}/${login}`;
-  const appUrl = `https://gitpacks.vercel.app?repo=${owner}/${repo}`;
+  const ogUrl = `https://www.gitpacks.com/api/card/${owner}/${repo}/${login}`;
+  const appUrl = `https://www.gitpacks.com?repo=${owner}/${repo}`;
 
   return {
     title: `${login} — ${owner}/${repo} | GitPacks`,
@@ -23,7 +24,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${login}'s GitPacks Card`,
       description: `Contributor card for ${owner}/${repo} on GitPacks`,
-      images: [{ url: ogUrl, width: 480, height: 720 }],
+      images: [{ url: ogUrl, width: 640, height: 960 }],
       url: appUrl,
     },
     twitter: {
@@ -58,9 +59,9 @@ export default async function CardPage({
 
   const cardImageUrl = `/api/card/${owner}/${repo}/${login}`;
   const appUrl = `/?repo=${owner}/${repo}`;
-  const shareUrl = `https://gitpacks.vercel.app/card/${owner}/${repo}/${login}`;
+  const shareUrl = `https://www.gitpacks.com/card/${owner}/${repo}/${login}`;
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out my GitPacks card for ${owner}/${repo}!`)}&url=${encodeURIComponent(shareUrl)}`;
-  const markdownSnippet = `[![${login} on ${owner}/${repo}](https://gitpacks.vercel.app/api/card/${owner}/${repo}/${login})](https://gitpacks.vercel.app?repo=${owner}/${repo})`;
+  const markdownSnippet = `[![${login} on ${owner}/${repo}](https://www.gitpacks.com/api/card/${owner}/${repo}/${login})](https://www.gitpacks.com?repo=${owner}/${repo})`;
 
   return (
     <div
@@ -74,15 +75,11 @@ export default async function CardPage({
         gap: '24px',
       }}
     >
-      <a href={appUrl}>
-        <img
-          src={cardImageUrl}
-          alt={`${login}'s GitPacks card for ${owner}/${repo}`}
-          width={320}
-          height={480}
-          style={{ borderRadius: '16px', maxWidth: '100%', height: 'auto' }}
-        />
-      </a>
+      <CardImage
+        src={cardImageUrl}
+        alt={`${login}'s GitPacks card for ${owner}/${repo}`}
+        href={appUrl}
+      />
 
       <div
         style={{

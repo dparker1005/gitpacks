@@ -3,7 +3,6 @@ import chromium from '@sparticuz/chromium-min';
 
 export const maxDuration = 30;
 
-// Hosted Chromium binary compatible with @sparticuz/chromium-min
 const CHROMIUM_URL = 'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar';
 
 export async function GET(
@@ -36,15 +35,29 @@ export async function GET(
     const page = await browser.newPage();
 
     const response = await page.goto(renderUrl, {
-      waitUntil: 'networkidle0',
-      timeout: 15000,
+      waitUntil: 'networkidle2',
+      timeout: 20000,
     });
 
     if (!response || response.status() === 404) {
       return new Response('Card not found', { status: 404 });
     }
 
-    await page.waitForSelector('[data-ready]', { timeout: 10000 });
+    // Wait for the card wrapper to exist
+    await page.waitForSelector('#card-wrapper', { timeout: 10000 });
+
+    // Wait for all images to load
+    await page.evaluate(() => {
+      return Promise.all(
+        Array.from(document.images).map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.addEventListener('load', resolve);
+            img.addEventListener('error', resolve);
+          });
+        })
+      );
+    });
 
     const cardElement = await page.$('#card-wrapper');
     if (!cardElement) {

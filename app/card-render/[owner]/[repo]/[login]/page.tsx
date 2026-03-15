@@ -106,34 +106,6 @@ export default async function CardRenderPage({
     <div class="card-footer"><span>#${String(idx).padStart(3, '0')} / ${total}</span><span class="card-footer-brand">GitPacks</span></div></div>
     <div class="card-total-badge">${total} in set</div></div>`;
 
-  // Client-side script to signal readiness after images load
-  const readyScript = `
-    (function() {
-      var wrapper = document.getElementById('card-wrapper');
-      var images = wrapper.querySelectorAll('img');
-      var loaded = 0;
-      var total = images.length;
-      function check() {
-        loaded++;
-        if (loaded >= total) {
-          wrapper.setAttribute('data-ready', 'true');
-        }
-      }
-      if (total === 0) {
-        wrapper.setAttribute('data-ready', 'true');
-      } else {
-        images.forEach(function(img) {
-          if (img.complete) {
-            check();
-          } else {
-            img.addEventListener('load', check);
-            img.addEventListener('error', check);
-          }
-        });
-      }
-    })();
-  `;
-
   return (
     <div
       style={{
@@ -149,13 +121,13 @@ export default async function CardRenderPage({
     >
       <div
         id="card-wrapper"
+        data-ready="true"
         style={{
           width: '320px',
           height: '480px',
         }}
         dangerouslySetInnerHTML={{ __html: cardHTML }}
       />
-      <script dangerouslySetInnerHTML={{ __html: readyScript }} />
     </div>
   );
 }

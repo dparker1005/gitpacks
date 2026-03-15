@@ -342,7 +342,20 @@ export async function GET(
                 border: '1px solid rgba(255,255,255,0.06)',
               }}
             >
-              <span style={{ fontSize: '24px' }}>{c.ability.icon}</span>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '8px',
+                  background: `${c.ability.color}20`,
+                  flexShrink: 0,
+                }}
+              >
+                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: c.ability.color }} />
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <div
                   style={{
@@ -390,7 +403,6 @@ export async function GET(
     {
       width: 480,
       height: 720,
-      emoji: 'twemoji',
       headers: {
         'Cache-Control': 'public, max-age=86400, s-maxage=86400',
       },

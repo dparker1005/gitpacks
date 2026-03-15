@@ -180,6 +180,7 @@ function startPackCountdown() {
 
 // ===== POPULAR REPOS =====
 async function loadPopularRepos() {
+  popularRepos.innerHTML = `<div style="text-align:center;padding:60px 20px"><div class="spinner"></div></div>`;
   try {
     const res = await fetch('/api/repos');
     if (!res.ok) return;

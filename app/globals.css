@@ -76,9 +76,6 @@
     .repo-gh-link:hover { color:#4adede; }
     .repo-gh-link svg { width:14px; height:14px; fill:currentColor; }
 
-    /* === ACHIEVEMENT SLOTS HINT === */
-    .ach-slots-hint { color:#666; font-size:0.65rem; font-style:italic; }
-
     .top-bar { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 20px 0; }
     .top-bar-left { display:flex; align-items:center; gap:10px; }
     .top-bar-right { display:flex; align-items:center; gap:10px; }
@@ -715,8 +712,8 @@
 
     /* === ACHIEVEMENT PANEL === */
     .achievement-panel { margin:16px auto; padding:14px 16px; border:1px solid rgba(120,115,245,0.15); border-radius:12px; background:rgba(120,115,245,0.04); max-width:480px; }
-    .achievement-header { font-family:'Orbitron',sans-serif; font-size:0.75rem; font-weight:700; color:#7873f5; letter-spacing:1.5px; margin-bottom:10px; display:flex; align-items:center; gap:10px; }
-    .ach-pack-badge { display:inline-block; padding:3px 10px; border-radius:20px; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; font-size:0.7rem; font-weight:700; letter-spacing:1px; }
+    .achievement-header { font-family:'Orbitron',sans-serif; font-size:0.75rem; font-weight:700; color:#7873f5; letter-spacing:1.5px; margin-bottom:4px; }
+    .ach-slots-info { display:flex; flex-direction:column; gap:2px; margin-bottom:10px; }
     .ach-claim-all { display:block; width:100%; margin-top:10px; padding:10px 20px; border:1.5px solid rgba(120,115,245,0.6); border-radius:8px; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:900; letter-spacing:2px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; box-shadow:0 4px 20px rgba(120,115,245,0.3); }
     .ach-claim-all:hover { transform:translateY(-2px); box-shadow:0 6px 30px rgba(120,115,245,0.5), 0 0 60px rgba(74,222,222,0.2); filter:brightness(1.1); }
     .ach-claim-all:disabled { opacity:0.5; cursor:default; transform:none; box-shadow:none; }
@@ -741,7 +738,8 @@
     .ach-label { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#777; }
     .ach-value { font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; }
     .ach-slots { display:flex; align-items:center; gap:3px; margin-left:auto; }
-    .ach-slots-label { font-family:'Rajdhani',sans-serif; font-size:0.7rem; color:#555; margin-left:auto; }
+    .ach-slots-label { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#666; letter-spacing:0.5px; }
+    .ach-slots-hint { font-family:'Rajdhani',sans-serif; font-size:0.7rem; color:#555; font-style:italic; }
     .ach-slot { display:flex; align-items:center; justify-content:center; width:32px; height:24px; border-radius:4px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; border:1px solid rgba(255,255,255,0.06); }
     .ach-slot-val { letter-spacing:0.3px; }
     .ach-slot-lock { font-size:0.55rem; opacity:0.4; }

@@ -247,18 +247,12 @@ async function loadPopularRepos() {
       // Dashboard layout for logged-in users — multi-column grid
       html += `<div class="dashboard">`;
 
-      // Left column: user's collections
-      html += `<div class="dashboard-col dashboard-col-left">`;
+      // Left column: In Progress + Contributed repos (async, at bottom so loading doesn't shift)
+      html += `<div class="dashboard-col">`;
       if (inProgressRepos.length) {
         html += `<div class="popular-section">
           <h3 class="popular-title">In Progress</h3>
           <div class="popular-grid">${inProgressRepos.map(r => repoBtn(r, true)).join('')}</div>
-        </div>`;
-      }
-      if (completedRepos.length) {
-        html += `<div class="popular-section">
-          <h3 class="popular-title">Completed Sets</h3>
-          <div class="popular-grid">${completedRepos.map(r => repoBtn(r, false)).join('')}</div>
         </div>`;
       }
       if (!inProgressRepos.length && !completedRepos.length) {
@@ -267,15 +261,21 @@ async function loadPopularRepos() {
           <p class="popular-hint">Open packs on any repo to start collecting!</p>
         </div>`;
       }
-      html += `</div>`;
-
-      // Right column: contributed repos + popular repos
-      html += `<div class="dashboard-col dashboard-col-right">`;
-      // Placeholder for contributed repos (lazy loaded) — reserves space with min-height
+      // Contributed repos load async — placed at bottom of column to avoid layout shift
       html += `<div id="contributed-section" class="popular-section contributed-placeholder">
         <h3 class="popular-title">Repos You Contribute To</h3>
         <div class="popular-grid"><div class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div></div>
       </div>`;
+      html += `</div>`;
+
+      // Right column: Completed Sets + Popular Repos
+      html += `<div class="dashboard-col">`;
+      if (completedRepos.length) {
+        html += `<div class="popular-section">
+          <h3 class="popular-title">Completed Sets</h3>
+          <div class="popular-grid">${completedRepos.map(r => repoBtn(r, false)).join('')}</div>
+        </div>`;
+      }
       if (otherRepos.length) {
         html += `<div class="popular-section">
           <h3 class="popular-title">Popular Repos</h3>
@@ -605,12 +605,14 @@ function renderRepoInfo(owner, repo) {
     }
 
     const claimAllBtn = totalClaimable > 1 ? `<button class="ach-claim-all" id="ach-claim-all">Open All (${totalClaimable} packs)</button>` : '';
-    const packBadge = totalClaimable > 0 ? `<span class="ach-pack-badge">${totalClaimable} pack${totalClaimable !== 1 ? 's' : ''}</span>` : '';
-    const slotsHint = maxPerStat < 5 ? 'Collect on larger repos to unlock more' : '';
-    const slotsLabel = `<span class="ach-slots-label" ${slotsHint ? `title="${slotsHint}"` : ''}>${maxPerStat}/5 slots${slotsHint ? ` <span class="ach-slots-hint">${slotsHint}</span>` : ''}</span>`;
+    const slotsHint = maxPerStat < 5 ? 'More slots unlock as the repo grows' : '';
 
     achievementHTML = `<div class="achievement-panel">
-      <div class="achievement-header">Your Achievements ${packBadge} ${slotsLabel}</div>
+      <div class="achievement-header">Your Achievements</div>
+      <div class="ach-slots-info">
+        <span class="ach-slots-label">${maxPerStat}/5 slots unlocked</span>
+        ${slotsHint ? `<span class="ach-slots-hint">${slotsHint}</span>` : ''}
+      </div>
       ${rows}
       ${claimAllBtn}
     </div>`;

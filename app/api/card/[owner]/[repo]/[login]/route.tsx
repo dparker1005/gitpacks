@@ -4,7 +4,7 @@ import chromium from '@sparticuz/chromium-min';
 export const maxDuration = 30;
 
 // Hosted Chromium binary compatible with @sparticuz/chromium-min
-const CHROMIUM_URL = 'https://github.com/nichochar/chromium-binaryies/releases/download/chromium-v131.0.1/chromium-v131.0.1-pack.tar';
+const CHROMIUM_URL = 'https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar';
 
 export async function GET(
   request: Request,

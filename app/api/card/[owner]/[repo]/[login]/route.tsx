@@ -1,80 +1,211 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import { ImageResponse } from '@vercel/og';
 
-export const maxDuration = 30;
+export const runtime = 'edge';
+
+const RARITY_COLORS: Record<string, string> = {
+  mythic: '#ff0040', legendary: '#ffd700', epic: '#c084fc', rare: '#60a5fa', common: '#888',
+};
+const RARITY_BORDER_GRADS: Record<string, string> = {
+  mythic: 'linear-gradient(135deg, #ff0040, #ff6600, #ff00ff)',
+  legendary: 'linear-gradient(135deg, #ffd700, #ff6ec7)',
+  epic: 'linear-gradient(135deg, #a855f7, #6366f1)',
+  rare: 'linear-gradient(135deg, #3b82f6, #06b6d4)',
+  common: '#3a3a5a',
+};
+const INNER_BGS: Record<string, string> = {
+  mythic: 'linear-gradient(165deg, #1a0a0a, #200810, #1a0508)',
+  legendary: 'linear-gradient(165deg, #1a1420, #201530, #150f24)',
+  epic: 'linear-gradient(165deg, #161428, #1a1538, #110f24)',
+  rare: 'linear-gradient(165deg, #121428, #151a35, #0f1224)',
+  common: 'linear-gradient(165deg, #141428, #1a1a35, #0f0f24)',
+};
+const INNER_GLOWS: Record<string, string> = {
+  mythic: 'radial-gradient(ellipse at 50% 0%, rgba(255,0,64,0.18) 0%, rgba(255,100,0,0.06) 40%, transparent 70%)',
+  legendary: 'radial-gradient(ellipse at 50% 0%, rgba(255,215,0,0.1) 0%, transparent 60%)',
+  epic: 'radial-gradient(ellipse at 50% 0%, rgba(168,85,247,0.08) 0%, transparent 60%)',
+  rare: 'radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.06) 0%, transparent 60%)',
+  common: '',
+};
+const OVERLAY_TARGETS: Record<string, string> = {
+  mythic: '#1a0508', legendary: '#150f24', epic: '#110f24', rare: '#0f1224', common: '#0f0f24',
+};
+const BADGE_STYLES: Record<string, { bg: string; color: string; border: string }> = {
+  mythic: { bg: 'linear-gradient(135deg, rgba(255,0,64,0.4), rgba(255,100,0,0.4))', color: '#ff0040', border: 'rgba(255,0,64,0.6)' },
+  legendary: { bg: 'linear-gradient(135deg, rgba(255,215,0,0.3), rgba(255,110,199,0.3))', color: '#ffd700', border: 'rgba(255,215,0,0.4)' },
+  epic: { bg: 'rgba(168,85,247,0.25)', color: '#c084fc', border: 'rgba(168,85,247,0.4)' },
+  rare: { bg: 'rgba(59,130,246,0.2)', color: '#60a5fa', border: 'rgba(59,130,246,0.4)' },
+  common: { bg: 'rgba(100,100,130,0.3)', color: '#888', border: 'rgba(100,100,130,0.4)' },
+};
+const POWER_GRADS: Record<string, string> = {
+  mythic: 'linear-gradient(90deg, #ff0040, #ff6600, #ff00ff)',
+  legendary: 'linear-gradient(90deg, #ffd700, #ff6ec7)',
+  epic: 'linear-gradient(90deg, #a855f7, #6366f1)',
+  rare: 'linear-gradient(90deg, #3b82f6, #06b6d4)',
+  common: 'linear-gradient(90deg, #555, #777)',
+};
+
+function fmt(n: number): string {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return n.toString();
+}
+
+// Twemoji CDN URL from emoji string
+function emojiToTwemojiUrl(emoji: string): string {
+  const codePoints = [...emoji]
+    .map((ch) => ch.codePointAt(0)!.toString(16))
+    .filter((cp) => cp !== 'fe0f');
+  return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codePoints.join('-')}.png`;
+}
+
+async function getContributor(owner: string, repo: string, login: string) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) return null;
+
+  const ownerRepo = `${owner}/${repo}`.toLowerCase();
+  const res = await fetch(
+    `${supabaseUrl}/rest/v1/repo_cache?owner_repo=eq.${encodeURIComponent(ownerRepo)}&select=data`,
+    { headers: { apikey: supabaseKey, Authorization: `Bearer ${supabaseKey}` } }
+  );
+  if (!res.ok) return null;
+  const rows = await res.json();
+  if (!rows.length || !Array.isArray(rows[0].data)) return null;
+
+  const all = rows[0].data;
+  const contributor = all.find((c: any) => c.login.toLowerCase() === login.toLowerCase());
+  if (!contributor) return null;
+  return { contributor, cardNum: all.indexOf(contributor) + 1, total: all.length };
+}
+
+// Correct static TTF URLs from Google Fonts (discovered via CSS API with User-Agent: Java/1.0)
+const orbitronBold = fetch(
+  'https://fonts.gstatic.com/s/orbitron/v35/yMJMMIlzdpvBhQQL_SC3X9yhF25-T1ny_Cmxpg.ttf'
+).then((res) => res.arrayBuffer());
+const rajdhaniMedium = fetch(
+  'https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pb0EMOs.ttf'
+).then((res) => res.arrayBuffer());
+const rajdhaniBold = fetch(
+  'https://fonts.gstatic.com/s/rajdhani/v17/LDI2apCSOBg7S-QT7pa8FsOs.ttf'
+).then((res) => res.arrayBuffer());
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ owner: string; repo: string; login: string }> }
 ) {
   const { owner, repo, login } = await params;
+  const result = await getContributor(owner, repo, login);
+  if (!result) return new Response('Card not found', { status: 404 });
 
-  const url = new URL(request.url);
-  const origin = `${url.protocol}//${url.host}`;
-  const renderUrl = `${origin}/card-render/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(login)}`;
+  const { contributor: c, cardNum, total } = result;
+  const rc = RARITY_COLORS[c.rarity] || '#888';
+  const borderGrad = RARITY_BORDER_GRADS[c.rarity] || RARITY_BORDER_GRADS.common;
+  const innerBg = INNER_BGS[c.rarity] || INNER_BGS.common;
+  const innerGlow = INNER_GLOWS[c.rarity] || '';
+  const overlayTarget = OVERLAY_TARGETS[c.rarity] || '#0f0f24';
+  const badge = BADGE_STYLES[c.rarity] || BADGE_STYLES.common;
+  const powerGrad = POWER_GRADS[c.rarity] || POWER_GRADS.common;
+  const repoName = `${owner}/${repo}`;
+  const emojiUrl = emojiToTwemojiUrl(c.ability.icon);
 
-  let browser;
-  try {
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: {
-        width: 800,
-        height: 600,
-        deviceScaleFactor: 2,
-      },
-      executablePath: await chromium.executablePath(),
-      headless: true,
-    });
+  const [orbitronData, rajdhaniData, rajdhaniBoldData] = await Promise.all([orbitronBold, rajdhaniMedium, rajdhaniBold]);
 
-    const page = await browser.newPage();
+  const stats = [
+    { label: 'Commits', value: fmt(c.commits), color: rc },
+    { label: 'PRs Merged', value: fmt(c.prsMerged), color: '#4ade80' },
+    { label: 'Issues', value: fmt(c.issues), color: '#f472b6' },
+    { label: 'Active Wks', value: String(c.activeWeeks), color: '#4adede' },
+    { label: 'Peak Week', value: String(c.peak), color: '#c084fc' },
+    { label: 'Streak', value: `${c.maxStreak}w`, color: '#facc15' },
+  ];
 
-    const response = await page.goto(renderUrl, {
-      waitUntil: 'networkidle2',
-      timeout: 20000,
-    });
+  return new ImageResponse(
+    (
+      <div style={{ width: '100%', height: '100%', display: 'flex', padding: c.rarity === 'mythic' ? '5px' : c.rarity === 'common' ? '2px' : '3px', background: borderGrad, borderRadius: '22px' }}>
+        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', background: innerBg, borderRadius: '18px', overflow: 'hidden', position: 'relative' }}>
+          {innerGlow && <div style={{ display: 'flex', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: innerGlow }} />}
 
-    if (!response || response.status() === 404) {
-      return new Response('Card not found', { status: 404 });
+          {/* Repo header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px 14px', fontFamily: 'Orbitron', fontSize: '13px', color: 'rgba(255,255,255,0.75)', letterSpacing: '2px', background: 'rgba(0,0,0,0.7)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            {repoName.toUpperCase()}
+          </div>
+
+          {/* Top section */}
+          <div style={{ display: 'flex', position: 'relative', height: '220px' }}>
+            <img src={c.avatar} width={480} height={220} style={{ position: 'absolute', top: 0, left: 0, width: '480px', height: '220px', objectFit: 'cover', opacity: 0.18 }} />
+            <div style={{ display: 'flex', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: `${overlayTarget}90` }} />
+            <div style={{ display: 'flex', position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: `linear-gradient(180deg, transparent 30%, ${overlayTarget} 100%)` }} />
+
+            <div style={{ display: 'flex', position: 'absolute', top: '38px', left: '16px', fontFamily: 'Orbitron', fontSize: '12px', fontWeight: 700, color: rc, letterSpacing: '1.5px', textTransform: 'uppercase' as const, padding: '5px 12px', borderRadius: '6px', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {c.title}
+            </div>
+
+            <div style={{ display: 'flex', position: 'absolute', top: '38px', right: '16px', fontFamily: 'Orbitron', fontSize: '12px', fontWeight: 700, color: badge.color, letterSpacing: '2px', textTransform: 'uppercase' as const, padding: '5px 12px', borderRadius: '6px', background: badge.bg, border: `1px solid ${badge.border}` }}>
+              {c.rarity}
+            </div>
+
+            <div style={{ display: 'flex', position: 'absolute', bottom: '-42px', left: 0, right: 0, justifyContent: 'center' }}>
+              <div style={{ display: 'flex', width: '110px', height: '110px', borderRadius: '50%', padding: '4px', background: borderGrad }}>
+                <img src={c.avatar} width={102} height={102} style={{ borderRadius: '50%', border: `3px solid ${overlayTarget}` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Body */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '48px 18px 0', flex: 1 }}>
+            <div style={{ fontFamily: 'Orbitron', fontSize: '22px', fontWeight: 700, color: '#fff', letterSpacing: '1px' }}>
+              {c.login}
+            </div>
+            <div style={{ fontFamily: 'Rajdhani', fontSize: '16px', color: '#888', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: '2px', marginBottom: '12px' }}>
+              {c.title}
+            </div>
+
+            {/* Power bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%', marginBottom: '14px' }}>
+              <span style={{ fontFamily: 'Orbitron', fontSize: '10px', color: '#666', letterSpacing: '2px' }}>PWR</span>
+              <div style={{ display: 'flex', flex: 1, height: '7px', background: '#1a1a35', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: `${c.power}%`, height: '100%', background: powerGrad, borderRadius: '4px' }} />
+              </div>
+              <span style={{ fontFamily: 'Orbitron', fontSize: '18px', fontWeight: 700, color: rc }}>{c.power}</span>
+            </div>
+
+            {/* Stats */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', width: '100%', gap: '6px', marginBottom: '12px' }}>
+              {stats.map((stat) => (
+                <div key={stat.label} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: '1 1 30%', padding: '8px 4px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+                  <div style={{ fontFamily: 'Orbitron', fontSize: '18px', fontWeight: 700, color: stat.color }}>{stat.value}</div>
+                  <div style={{ fontFamily: 'Rajdhani', fontSize: '10px', color: '#666', letterSpacing: '1px', textTransform: 'uppercase' as const, marginTop: '2px' }}>{stat.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Ability */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%', padding: '9px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '10px' }}>
+              <img src={emojiUrl} width={24} height={24} style={{ flexShrink: 0 }} />
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{ fontFamily: 'Orbitron', fontSize: '12px', fontWeight: 700, color: c.ability.color, letterSpacing: '1px' }}>{c.ability.name}</div>
+                <div style={{ fontFamily: 'Rajdhani', fontSize: '14px', color: '#777' }}>{c.ability.desc}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px', fontFamily: 'Orbitron', fontSize: '11px', color: '#888', letterSpacing: '1.5px', background: 'rgba(0,0,0,0.3)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <span>#{String(cardNum).padStart(3, '0')} / {total}</span>
+            <span style={{ color: '#7873f5', fontWeight: 700, fontSize: '12px' }}>GitPacks</span>
+          </div>
+        </div>
+      </div>
+    ),
+    {
+      width: 480,
+      height: 720,
+      headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+      fonts: [
+        { name: 'Orbitron', data: orbitronData, weight: 700, style: 'normal' as const },
+        { name: 'Rajdhani', data: rajdhaniData, weight: 500, style: 'normal' as const },
+        { name: 'Rajdhani', data: rajdhaniBoldData, weight: 700, style: 'normal' as const },
+      ],
     }
-
-    await page.waitForSelector('#card-wrapper', { timeout: 10000 });
-
-    // Wait for all images to finish loading
-    await page.evaluate(() => {
-      return Promise.all(
-        Array.from(document.images).map((img) => {
-          if (img.complete) return Promise.resolve();
-          return new Promise((resolve) => {
-            img.addEventListener('load', resolve);
-            img.addEventListener('error', resolve);
-          });
-        })
-      );
-    });
-
-    const cardElement = await page.$('#card-wrapper');
-    if (!cardElement) {
-      return new Response('Card element not found', { status: 500 });
-    }
-
-    const screenshot = await cardElement.screenshot({
-      type: 'png',
-      omitBackground: true,
-    });
-
-    const buffer = Buffer.from(screenshot);
-    return new Response(buffer, {
-      headers: {
-        'Content-Type': 'image/png',
-        'Cache-Control': 'public, max-age=86400, s-maxage=86400',
-      },
-    });
-  } catch (error: any) {
-    console.error('Card screenshot error:', error?.message || error);
-    return new Response(`Failed to generate card image: ${error?.message || 'Unknown error'}`, { status: 500 });
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
-  }
+  );
 }

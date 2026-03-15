@@ -9,13 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^143.0.4",
     "@supabase/ssr": "^0.9.0",
     "@supabase/supabase-js": "^2.99.1",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/og": "^0.11.1",
     "@vercel/speed-insights": "^2.0.0",
     "next": "16.1.6",
-    "puppeteer-core": "^24.39.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },

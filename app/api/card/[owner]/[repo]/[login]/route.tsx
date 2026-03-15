@@ -34,17 +34,26 @@ export async function GET(
 
     const page = await browser.newPage();
 
+    console.log('Navigating to:', renderUrl);
     const response = await page.goto(renderUrl, {
       waitUntil: 'networkidle2',
       timeout: 20000,
     });
 
-    if (!response || response.status() === 404) {
+    const status = response?.status();
+    console.log('Page status:', status);
+
+    if (!response || status === 404) {
       return new Response('Card not found', { status: 404 });
     }
 
-    // Wait for the card wrapper to exist
-    await page.waitForSelector('#card-wrapper', { timeout: 10000 });
+    // Check if page has the card
+    const hasCard = await page.$('#card-wrapper');
+    if (!hasCard) {
+      const html = await page.content();
+      console.error('Page HTML (first 500 chars):', html.substring(0, 500));
+      return new Response('Card element not found on render page', { status: 500 });
+    }
 
     // Wait for all images to load
     await page.evaluate(() => {

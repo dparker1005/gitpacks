@@ -11,10 +11,9 @@ export async function GET(
 ) {
   const { owner, repo, login } = await params;
 
+  // Use the request's own origin so the render page is always reachable
   const url = new URL(request.url);
-  const origin = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : `${url.protocol}//${url.host}`;
+  const origin = `${url.protocol}//${url.host}`;
   const renderUrl = `${origin}/card-render/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(login)}`;
 
   let browser;

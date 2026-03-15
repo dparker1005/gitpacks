@@ -15,7 +15,7 @@ export async function generateMetadata({
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { owner, repo, login } = await params;
-  const ogUrl = `https://www.gitpacks.com/api/card/${owner}/${repo}/${login}`;
+  const ogUrl = `https://www.gitpacks.com/api/card/${owner}/${repo}/${login}?format=png`;
   const appUrl = `https://www.gitpacks.com?repo=${owner}/${repo}`;
 
   return {
@@ -24,7 +24,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${login}'s GitPacks Card`,
       description: `Contributor card for ${owner}/${repo} on GitPacks`,
-      images: [{ url: ogUrl, width: 640, height: 960 }],
+      images: [{ url: ogUrl, width: 960, height: 1440 }],
       url: appUrl,
     },
     twitter: {
@@ -57,7 +57,8 @@ export default async function CardPage({
     redirect(`/?repo=${owner}/${repo}`);
   }
 
-  const cardImageUrl = `/api/card/${owner}/${repo}/${login}`;
+  const cardSvgUrl = `/api/card/${owner}/${repo}/${login}`;
+  const cardImageUrl = cardSvgUrl; // SVG — animated in browser
   const appUrl = `/?repo=${owner}/${repo}`;
   const shareUrl = `https://www.gitpacks.com/card/${owner}/${repo}/${login}`;
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out my GitPacks card for ${owner}/${repo}!`)}&url=${encodeURIComponent(shareUrl)}`;

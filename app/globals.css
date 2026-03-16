@@ -867,11 +867,6 @@
     .landing-step-num { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; display:flex; align-items:center; justify-content:center; margin:0 auto 12px; }
     .landing-step h3 { font-family:'Orbitron',sans-serif; font-size:0.8rem; color:#ccc; letter-spacing:1px; margin-bottom:6px; }
     .landing-step p { font-family:'Rajdhani',sans-serif; font-size:0.85rem; color:#666; }
-    .landing-features { display:flex; justify-content:center; gap:20px; margin:36px 0 10px; flex-wrap:wrap; }
-    .landing-feature { max-width:180px; text-align:center; padding:16px 12px; border:1px solid rgba(255,255,255,0.06); border-radius:12px; background:rgba(255,255,255,0.02); }
-    .landing-feature-icon { font-size:1.6rem; margin-bottom:8px; }
-    .landing-feature h3 { font-family:'Orbitron',sans-serif; font-size:0.7rem; color:#ccc; letter-spacing:1px; margin-bottom:6px; }
-    .landing-feature p { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#666; line-height:1.4; }
     .landing-starter { margin-top:16px; }
     .landing-starter p { font-family:'Rajdhani',sans-serif; font-size:0.95rem; color:#888; }
     .landing-starter strong { color:#4adede; }
@@ -907,8 +902,6 @@
 
     @media (max-width:600px) {
       .landing-hero h2 { font-size:1.1rem; }
-      .landing-features { gap:12px; }
-      .landing-feature { max-width:45%; flex:1 1 140px; padding:12px 10px; }
       .landing-steps { gap:20px; }
       .landing-step { max-width:160px; }
       .welcome-content { padding:30px 20px; }

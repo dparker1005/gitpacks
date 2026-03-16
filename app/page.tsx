@@ -130,44 +130,21 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="landing-features">
-            <div className="landing-feature">
-              <div className="landing-feature-icon">&#127183;</div>
-              <h3>5 Rarities</h3>
-              <p>Common, Rare, Epic, Legendary, and Mythic cards based on real contribution data</p>
-            </div>
-            <div className="landing-feature">
-              <div className="landing-feature-icon">&#11088;</div>
-              <h3>Stars &amp; Recycling</h3>
-              <p>Revert duplicates to earn Stars, then cherry-pick the exact cards you need</p>
-            </div>
-            <div className="landing-feature">
-              <div className="landing-feature-icon">&#127942;</div>
-              <h3>Achievements</h3>
-              <p>Contribute to repos and claim milestone packs for your commits, PRs, and streaks</p>
-            </div>
-            <div className="landing-feature">
-              <div className="landing-feature-icon">&#127941;</div>
-              <h3>Leaderboard</h3>
-              <p>Earn points for every card collected, with a 1.5x bonus for completing a repo</p>
-            </div>
-          </div>
-
           <div className="landing-steps">
             <div className="landing-step">
               <div className="landing-step-num">1</div>
-              <h3>Pick a repo</h3>
-              <p>Choose any public GitHub repository</p>
+              <h3>Open packs</h3>
+              <p>Each pack contains 5 contributor cards across 5 rarities — from Common to Mythic</p>
             </div>
             <div className="landing-step">
               <div className="landing-step-num">2</div>
-              <h3>Open packs</h3>
-              <p>Each pack contains 5 contributor cards with different rarities</p>
+              <h3>Complete your collection</h3>
+              <p>Collect every contributor for a repo. Earn free packs by contributing to repos on GitHub.</p>
             </div>
             <div className="landing-step">
               <div className="landing-step-num">3</div>
-              <h3>Complete your collection</h3>
-              <p>Collect all contributors and climb the leaderboard</p>
+              <h3>Climb the leaderboard</h3>
+              <p>Every card earns points. Complete a collection for a 1.5x bonus.</p>
             </div>
           </div>
 

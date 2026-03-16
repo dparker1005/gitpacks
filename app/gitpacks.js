@@ -603,6 +603,9 @@ async function loadRepo() {
       } catch { /* silent */ }
     }
 
+    // Capture card param before replaceState strips it
+    const urlCard = new URLSearchParams(window.location.search).get('card');
+
     loading.style.display = 'none';
     searchContainer.style.display = 'none';
     document.getElementById('gallery-screen').classList.add('repo-loaded');
@@ -619,7 +622,6 @@ async function loadRepo() {
     }
 
     // Auto-open card from URL param (e.g. ?repo=owner/repo&card=login)
-    const urlCard = new URLSearchParams(window.location.search).get('card');
     if (urlCard) {
       const target = allContributors.find(c => c.login.toLowerCase() === urlCard.toLowerCase());
       if (target) openFullscreenCard(target);

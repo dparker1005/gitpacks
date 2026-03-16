@@ -864,15 +864,15 @@ function renderRepoInfo(owner, repo) {
           </div>
         </details>`;
       }
-      const leftCol = achievementHTML ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '';
-      const pointsTotal = breakdownHTML ? (() => {
+      const leftCol = _currentUser ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML || '<div class="achievement-panel"><div class="ach-empty">Open packs to earn achievement rewards!</div></div>'}</details>` : '';
+      const pointsTotal = (() => {
         let tb = 0;
         rarityOrder.forEach(r => { tb += allContributors.filter(c => c.rarity === r && library[c.login]).length * rarityPts[r]; });
         const cb = isComplete ? Math.floor(tb * 0.5) : 0;
         return tb + cb;
-      })() : 0;
+      })();
       const rightPanels = [
-        breakdownHTML ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Points <span class="panel-summary">${pointsTotal.toLocaleString()} pts${!isComplete ? ' &middot; 1.5x bonus at completion' : ' &middot; 1.5x bonus active'}</span></summary>${breakdownHTML}</details>` : '',
+        _currentUser ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Score <span class="panel-summary">${pointsTotal.toLocaleString()} pts${!isComplete ? ' &middot; 1.5x bonus at completion' : ' &middot; 1.5x bonus active'}</span></summary>${breakdownHTML || '<div class="points-breakdown"><div class="pb-empty">Collect cards to earn points!</div></div>'}</details>` : '',
         starsHTML
       ].filter(Boolean).join('');
       const rightCol = rightPanels ? `<div class="repo-panels-right">${rightPanels}</div>` : '';
@@ -910,12 +910,20 @@ function renderRepoInfo(owner, repo) {
       <input type="text" class="card-search" id="card-search" placeholder="Search cards..." value="${cardSearch}" />
     </div>`;
 
-  // Open achievements and stars panels on desktop, points stays closed with summary
-  if (window.innerWidth > 768) {
-    const achPanel = document.getElementById('achievements-panel');
-    if (achPanel) achPanel.setAttribute('open', '');
-    const starsPanel = document.getElementById('stars-panel');
-    if (starsPanel) starsPanel.setAttribute('open', '');
+  // Panel open/close logic: achievements & stars open on desktop; on mobile, only if actionable
+  const _isMobile = window.innerWidth <= 768;
+  const achPanel = document.getElementById('achievements-panel');
+  if (achPanel) {
+    if (!_isMobile || document.querySelector('.ach-slot.claimable, #ach-claim-all')) {
+      achPanel.setAttribute('open', '');
+    }
+  }
+  // Points/score panel always stays closed
+  const starsPanel = document.getElementById('stars-panel');
+  if (starsPanel) {
+    if (!_isMobile || document.getElementById('revert-all-btn') || document.getElementById('cherry-pick-all-btn')) {
+      starsPanel.setAttribute('open', '');
+    }
   }
 
   // Wire up open pack button

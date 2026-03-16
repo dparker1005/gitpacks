@@ -16,7 +16,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { owner, repo, login } = await params;
   const ogUrl = `https://www.gitpacks.com/api/card/${owner}/${repo}/${login}?format=png`;
-  const appUrl = `https://www.gitpacks.com?repo=${owner}/${repo}`;
+  const cardUrl = `https://www.gitpacks.com/card/${owner}/${repo}/${login}`;
 
   return {
     title: `${login} — ${owner}/${repo} | GitPacks`,
@@ -25,7 +25,7 @@ export async function generateMetadata({
       title: `${login}'s GitPacks Card`,
       description: `Contributor card for ${owner}/${repo} on GitPacks`,
       images: [{ url: ogUrl, width: 960, height: 1440 }],
-      url: appUrl,
+      url: cardUrl,
     },
     twitter: {
       card: 'summary_large_image',
@@ -58,11 +58,19 @@ export default async function CardPage({
   }
 
   const cardSvgUrl = `/api/card/${owner}/${repo}/${login}`;
-  const cardImageUrl = cardSvgUrl; // SVG — animated in browser
-  const appUrl = `/?repo=${owner}/${repo}`;
+  const viewCardUrl = `/?repo=${owner}/${repo}&card=${login}`;
   const shareUrl = `https://www.gitpacks.com/card/${owner}/${repo}/${login}`;
   const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out my GitPacks card for ${owner}/${repo}!`)}&url=${encodeURIComponent(shareUrl)}`;
-  const markdownSnippet = `[![${login} on ${owner}/${repo}](https://www.gitpacks.com/api/card/${owner}/${repo}/${login})](https://www.gitpacks.com?repo=${owner}/${repo})`;
+  const markdownSnippet = `<a href="${shareUrl}"><img src="https://www.gitpacks.com/api/card/${owner}/${repo}/${login}" alt="${login} on ${owner}/${repo}" width="200" /></a>`;
+
+  const rarityColors: Record<string, string> = {
+    mythic: '#ff0040',
+    legendary: '#ffd700',
+    epic: '#c084fc',
+    rare: '#60a5fa',
+    common: '#888',
+  };
+  const rc = rarityColors[contributor.rarity] || '#888';
 
   return (
     <div
@@ -77,10 +85,45 @@ export default async function CardPage({
       }}
     >
       <CardImage
-        src={cardImageUrl}
+        src={cardSvgUrl}
         alt={`${login}'s GitPacks card for ${owner}/${repo}`}
-        href={appUrl}
+        href={viewCardUrl}
       />
+
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          maxWidth: '500px',
+          width: '100%',
+        }}
+      >
+        <div
+          style={{
+            fontFamily: 'Orbitron, sans-serif',
+            fontSize: '0.65rem',
+            color: rc,
+            letterSpacing: '2px',
+            textTransform: 'uppercase',
+          }}
+        >
+          {contributor.rarity}
+        </div>
+        <div
+          style={{
+            fontFamily: 'Rajdhani, sans-serif',
+            fontSize: '0.85rem',
+            color: '#888',
+            textAlign: 'center',
+            marginBottom: '12px',
+          }}
+        >
+          {login}&apos;s contributor card for{' '}
+          <span style={{ color: '#ccc' }}>{owner}/{repo}</span>
+        </div>
+      </div>
 
       <div
         style={{
@@ -93,7 +136,7 @@ export default async function CardPage({
         }}
       >
         <a
-          href={appUrl}
+          href={viewCardUrl}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -110,7 +153,7 @@ export default async function CardPage({
             textDecoration: 'none',
           }}
         >
-          View Repo on GitPacks
+          View Card on GitPacks
         </a>
 
         <div
@@ -139,6 +182,36 @@ export default async function CardPage({
           >
             Share on X
           </a>
+        </div>
+
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '20px 0 10px',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            marginTop: '8px',
+            width: '100%',
+          }}
+        >
+          <div
+            style={{
+              fontFamily: 'Rajdhani, sans-serif',
+              fontSize: '0.9rem',
+              color: '#888',
+              marginBottom: '6px',
+            }}
+          >
+            Open packs, collect contributors, and climb the leaderboard.
+          </div>
+          <div
+            style={{
+              fontFamily: 'Rajdhani, sans-serif',
+              fontSize: '0.85rem',
+              color: '#666',
+            }}
+          >
+            <strong style={{ color: '#4adede' }}>10 free packs</strong> when you sign up
+          </div>
         </div>
 
         <details

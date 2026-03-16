@@ -617,6 +617,13 @@ async function loadRepo() {
         if (_currentUser) loadLibraryFromDB().then(() => { renderRepoInfoFromCurrent(); renderLibrary(); });
       });
     }
+
+    // Auto-open card from URL param (e.g. ?repo=owner/repo&card=login)
+    const urlCard = new URLSearchParams(window.location.search).get('card');
+    if (urlCard) {
+      const target = allContributors.find(c => c.login.toLowerCase() === urlCard.toLowerCase());
+      if (target) openFullscreenCard(target);
+    }
   } catch (err) { console.error('[GHTC] loadRepo error:', err.message, err.stack); showError(err.message); loading.style.display = 'none'; }
   btn.disabled = false;
 }
@@ -2047,7 +2054,7 @@ function openFullscreenCard(c) {
 
   // Share buttons
   const shareUrl = `${window.location.origin}/card/${currentRepoName}/${c.login}`;
-  const mdSnippet = `[![${c.login} on ${currentRepoName}](${window.location.origin}/api/card/${currentRepoName}/${c.login})](${window.location.origin}?repo=${currentRepoName})`;
+  const mdSnippet = `<a href="${window.location.origin}/card/${currentRepoName}/${c.login}"><img src="${window.location.origin}/api/card/${currentRepoName}/${c.login}" alt="${c.login} on ${currentRepoName}" width="200" /></a>`;
 
   const copyLinkBtn = overlay.querySelector('#fs-copy-link');
   if (copyLinkBtn) copyLinkBtn.addEventListener('click', () => {

@@ -132,7 +132,7 @@ function getTitle(c: any, p: any, isFirstCommitter: boolean, rarity: string): st
   }
 
   if (c.inactive) {
-    return ({ mythic: 'Eternal Legend', legendary: 'The Eternal', epic: 'Cornerstone', rare: 'Foundation', common: 'Legacy' } as any)[rarity];
+    return ({ mythic: 'Eternal Legend', legendary: 'Eternal', epic: 'Cornerstone', rare: 'Foundation', common: 'Legacy' } as any)[rarity];
   }
 
   const hasNonCommitActivity = c.prsMerged > 0 || c.issues > 0;

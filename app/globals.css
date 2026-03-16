@@ -226,21 +226,22 @@
     .action-buttons { display:flex; gap:10px; justify-content:center; margin-top:14px; flex-wrap:wrap; align-items:center; }
 
     /* === FILTERS === */
-    .filter-bar { display:flex; gap:8px; justify-content:center; align-items:center; margin-top:16px; flex-wrap:wrap; }
-    .filter-btn { padding:6px 16px; border:1px solid #333; border-radius:8px; background:none; color:#666; font-family:'Orbitron',sans-serif; font-size:0.6rem; font-weight:700; letter-spacing:1.5px; cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
+    .filter-bar { display:flex; gap:6px; justify-content:center; align-items:center; margin-top:16px; flex-wrap:wrap; }
+    .filter-group { display:flex; gap:4px; align-items:center; padding:0 4px; }
+    .filter-group + .filter-group { border-left:1px solid #333; padding-left:12px; }
+    .filter-btn { padding:6px 14px; border:1px solid #333; border-radius:8px; background:none; color:#666; font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1.5px; cursor:pointer; transition:all 0.2s; text-transform:uppercase; }
     .filter-btn:hover { border-color:#555; color:#aaa; }
-    .filter-btn.active { color:#fff; border-color:transparent; }
-    .filter-btn.active[data-rarity="all"] { background:linear-gradient(135deg,#7873f5,#4adede); }
-    .filter-btn.active[data-rarity="mythic"] { background:linear-gradient(135deg,#ff0040,#ff6600,#ff0040); background-size:200% 200%; animation:mythicBtn 2s ease infinite; color:#fff; }
-    @keyframes mythicBtn { 0%,100% { background-position:0% 50%; } 50% { background-position:100% 50%; } }
-    .filter-btn.active[data-rarity="legendary"] { background:linear-gradient(135deg,#ffd700,#ff6ec7); color:#000; }
-    .filter-btn.active[data-rarity="epic"] { background:linear-gradient(135deg,#a855f7,#6366f1); }
-    .filter-btn.active[data-rarity="rare"] { background:linear-gradient(135deg,#3b82f6,#06b6d4); }
-    .filter-btn.active[data-rarity="common"] { background:#4a4a6a; }
-    .filter-sep { width:1px; height:20px; background:#333; margin:0 4px; }
-    .card-search { width:160px; padding:6px 14px; border:1px solid #333; border-radius:8px; background:rgba(20,20,40,0.6); color:#ccc; font-family:'Rajdhani',sans-serif; font-size:0.85rem; outline:none; transition:border-color 0.2s; }
+    .filter-btn.active { color:#fff; border-color:transparent; background:linear-gradient(135deg,#7873f5,#4adede); }
+    .sort-select { padding:6px 12px; border:1px solid #333; border-radius:8px; background:rgba(20,20,40,0.6); color:#ccc; font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; outline:none; cursor:pointer; transition:border-color 0.2s; -webkit-appearance:none; appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; padding-right:24px; }
+    .sort-select:focus { border-color:#7873f5; }
+    .sort-select option { background:#1a1a2e; color:#ccc; }
+    .card-search { width:120px; padding:6px 12px; border:1px solid #333; border-radius:8px; background:rgba(20,20,40,0.6); color:#ccc; font-family:'Rajdhani',sans-serif; font-size:0.85rem; outline:none; transition:border-color 0.2s; }
     .card-search:focus { border-color:#7873f5; }
     .card-search::placeholder { color:#555; }
+    @media (max-width:600px) {
+      .filter-group + .filter-group { border-left:none; padding-left:4px; }
+      .filter-group { justify-content:center; }
+    }
 
     /* === GALLERY CARDS === */
     #cards-grid { display:flex; flex-wrap:wrap; justify-content:center; gap:36px; padding:10px 30px 60px; }

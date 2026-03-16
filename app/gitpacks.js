@@ -33,7 +33,8 @@ let library = {};
 let repoLoaded = false;
 let currentRepoName = '';
 let filterRarity = 'all';
-let showMissing = false;
+let viewMode = 'collected'; // 'collected', 'missing', 'all'
+let sortBy = 'power'; // 'power', 'name', 'commits', 'prs', 'issues', 'streak', 'consistency', 'peak'
 let cardSearch = '';
 
 // Pack state for all users
@@ -545,7 +546,7 @@ async function loadRepo() {
     loading.innerHTML = `<div style="text-align:center;padding:60px 20px">
       <div class="spinner"></div>
       <p style="color:#888;font-family:'Orbitron',sans-serif;font-size:0.8rem;letter-spacing:2px;margin-top:20px">Loading contributors...</p>
-      <p style="color:#555;font-size:0.75rem;margin-top:8px">This may take a moment for large repos</p>
+      <p style="color:#555;font-size:0.75rem;margin-top:8px">This may take a moment</p>
     </div>`;
 
     const response = await fetch(`/api/repo/${owner}/${repo}`);
@@ -799,20 +800,36 @@ function renderRepoInfo(owner, repo) {
       </div>
     </div>
     ${breakdownHTML || achievementHTML ? `<div class="repo-panels-row">
-      ${breakdownHTML ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Points</summary>${breakdownHTML}</details>` : ''}
       ${achievementHTML ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : ''}
+      ${breakdownHTML ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Points</summary>${breakdownHTML}</details>` : ''}
     </div>` : ''}
     <div class="filter-bar" id="filter-bar">
-      <button class="filter-btn ${filterRarity==='all'?'active':''}" data-rarity="all" onclick="setFilter('all')">All</button>
-      <button class="filter-btn ${filterRarity==='mythic'?'active':''}" data-rarity="mythic" onclick="setFilter('mythic')">Mythic</button>
-      <button class="filter-btn ${filterRarity==='legendary'?'active':''}" data-rarity="legendary" onclick="setFilter('legendary')">Legendary</button>
-      <button class="filter-btn ${filterRarity==='epic'?'active':''}" data-rarity="epic" onclick="setFilter('epic')">Epic</button>
-      <button class="filter-btn ${filterRarity==='rare'?'active':''}" data-rarity="rare" onclick="setFilter('rare')">Rare</button>
-      <button class="filter-btn ${filterRarity==='common'?'active':''}" data-rarity="common" onclick="setFilter('common')">Common</button>
-      <div class="filter-sep"></div>
-      <button class="filter-btn ${showMissing?'active':''}" style="${showMissing?'background:linear-gradient(135deg,#7873f5,#4adede);color:#fff':''}" onclick="toggleMissing()">Show Missing</button>
-      <div class="filter-sep"></div>
-      <input type="text" class="card-search" id="card-search" placeholder="Search cards..." value="${cardSearch}" />
+      <div class="filter-group">
+        <button class="filter-btn ${filterRarity==='all'?'active':''}" onclick="setFilter('all')">All</button>
+        <button class="filter-btn ${filterRarity==='mythic'?'active':''}" onclick="setFilter('mythic')">Mythic</button>
+        <button class="filter-btn ${filterRarity==='legendary'?'active':''}" onclick="setFilter('legendary')">Legendary</button>
+        <button class="filter-btn ${filterRarity==='epic'?'active':''}" onclick="setFilter('epic')">Epic</button>
+        <button class="filter-btn ${filterRarity==='rare'?'active':''}" onclick="setFilter('rare')">Rare</button>
+        <button class="filter-btn ${filterRarity==='common'?'active':''}" onclick="setFilter('common')">Common</button>
+      </div>
+      <div class="filter-group">
+        <button class="filter-btn ${viewMode==='collected'?'active':''}" onclick="setViewMode('collected')">Collected</button>
+        <button class="filter-btn ${viewMode==='all'?'active':''}" onclick="setViewMode('all')">All Cards</button>
+        <button class="filter-btn ${viewMode==='missing'?'active':''}" onclick="setViewMode('missing')">Missing</button>
+      </div>
+      <div class="filter-group">
+        <select class="sort-select" id="sort-select" onchange="setSortBy(this.value)">
+          <option value="power" ${sortBy==='power'?'selected':''}>Power</option>
+          <option value="name" ${sortBy==='name'?'selected':''}>Name</option>
+          <option value="commits" ${sortBy==='commits'?'selected':''}>Commits</option>
+          <option value="prs" ${sortBy==='prs'?'selected':''}>PRs Merged</option>
+          <option value="issues" ${sortBy==='issues'?'selected':''}>Issues</option>
+          <option value="streak" ${sortBy==='streak'?'selected':''}>Streak</option>
+          <option value="peak" ${sortBy==='peak'?'selected':''}>Peak Week</option>
+          <option value="consistency" ${sortBy==='consistency'?'selected':''}>Consistency</option>
+        </select>
+        <input type="text" class="card-search" id="card-search" placeholder="Search..." value="${cardSearch}" />
+      </div>
     </div>`;
 
   // Open panels on desktop, closed on mobile
@@ -1705,9 +1722,14 @@ window.claimMilestone = claimMilestone;
 window.claimAllMilestones = claimAllMilestones;
 
 // ===== COMPLETE LIBRARY =====
-function toggleMissing() {
-  showMissing = !showMissing;
+function setViewMode(mode) {
+  viewMode = mode;
   renderRepoInfoFromCurrent();
+  renderLibrary();
+}
+
+function setSortBy(sort) {
+  sortBy = sort;
   renderLibrary();
 }
 
@@ -1727,7 +1749,9 @@ function newRepo() {
   library = {};
   currentRepoName = '';
   filterRarity = 'all';
-  showMissing = false;
+  viewMode = 'collected';
+  sortBy = 'power';
+  cardSearch = '';
   packState = null;
   if (packCountdownInterval) clearInterval(packCountdownInterval);
   grid.innerHTML = '';
@@ -1746,7 +1770,7 @@ function renderLibrary() {
   grid.innerHTML = '';
   if (!repoLoaded) return;
   const allCollected = allContributors.filter(c => library[c.login]);
-  if (allCollected.length === 0 && !showMissing) {
+  if (allCollected.length === 0 && viewMode === 'collected') {
     grid.innerHTML = `<div class="empty-library">
       <div class="empty-icon">${GP_ICON}</div>
       <p>Open a pack to start collecting!</p>
@@ -1754,11 +1778,25 @@ function renderLibrary() {
     return;
   }
 
-  let pool = showMissing ? [...allContributors] : [...allCollected];
+  let pool;
+  if (viewMode === 'missing') pool = allContributors.filter(c => !library[c.login]);
+  else if (viewMode === 'all') pool = [...allContributors];
+  else pool = [...allCollected];
+
   if (filterRarity !== 'all') pool = pool.filter(c => c.rarity === filterRarity);
   if (cardSearch) { const q = cardSearch.toLowerCase(); pool = pool.filter(c => c.login.toLowerCase().includes(q) || (c.title && c.title.toLowerCase().includes(q))); }
 
-  pool.sort((a, b) => b.power - a.power);
+  const sortFns = {
+    power: (a, b) => b.power - a.power,
+    name: (a, b) => a.login.localeCompare(b.login),
+    commits: (a, b) => b.commits - a.commits,
+    prs: (a, b) => b.prsMerged - a.prsMerged,
+    issues: (a, b) => b.issues - a.issues,
+    streak: (a, b) => b.maxStreak - a.maxStreak,
+    peak: (a, b) => b.peak - a.peak,
+    consistency: (a, b) => b.activeWeeks - a.activeWeeks,
+  };
+  pool.sort(sortFns[sortBy] || sortFns.power);
 
   if (pool.length === 0) {
     grid.innerHTML = `<div class="empty-library"><p>No cards match filters</p></div>`;
@@ -1934,7 +1972,8 @@ function powerGrad(r) { return {mythic:'linear-gradient(90deg,#ff0040,#ff6600,#f
 // Expose functions used by inline onclick handlers in dynamically generated HTML
 window.openPack = openPack;
 window.setFilter = setFilter;
-window.toggleMissing = toggleMissing;
+window.setViewMode = setViewMode;
+window.setSortBy = setSortBy;
 window.quickLoad = quickLoad;
 
 function buildGalleryCard(c, idx, total) {

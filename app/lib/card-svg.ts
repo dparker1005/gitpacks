@@ -206,7 +206,7 @@ export function buildCardSvg(
     <text x="${W / 2}" y="${borderWidth + 23}" fill="rgba(255,255,255,0.7)" font-family="'Orbitron',sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="2">${escapeXml(repoName.toUpperCase())}</text>
 
     <!-- Title chip -->
-    <rect x="18" y="52" width="${Math.min(c.title.length * 9.5 + 24, 240)}" height="28" rx="6" fill="rgba(0,0,0,0.65)" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+    <rect x="18" y="52" width="${Math.min(c.title.length * 11 + 24, 300)}" height="28" rx="6" fill="rgba(0,0,0,0.65)" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
     <text x="30" y="70" fill="${rc}" font-family="'Orbitron',sans-serif" font-size="12" font-weight="700" letter-spacing="1.5">${escapeXml(c.title.toUpperCase())}</text>
 
     <!-- Rarity badge -->

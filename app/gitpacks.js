@@ -211,11 +211,14 @@ async function loadPopularRepos() {
         r.pct = r.cards > 0 ? r.collected / r.cards : 0;
       });
     } else {
-      // Merge user repo data with all repos
+      // Merge user repo data (including scores) with all repos
       repos.forEach(r => {
         const ur = userRepos.find(u => u.name === r.name.toLowerCase());
         r.collected = ur ? ur.collected : 0;
         r.pct = r.cards > 0 ? r.collected / r.cards : 0;
+        r.base_points = ur ? ur.base_points : 0;
+        r.completion_bonus = ur ? ur.completion_bonus : 0;
+        r.total_points = ur ? ur.total_points : 0;
       });
     }
 

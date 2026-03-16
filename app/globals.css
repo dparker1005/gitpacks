@@ -127,8 +127,9 @@
 
     /* === REPO CONTENT LAYOUT === */
     .repo-action-row { display:flex; justify-content:center; margin-top:14px; }
-    .repo-panels-row { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:16px; flex-wrap:wrap; max-width:900px; margin-left:auto; margin-right:auto; }
-    .repo-panel-collapse { flex:1 1 280px; max-width:420px; min-width:260px; }
+    .repo-panels-row { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:16px; max-width:900px; margin-left:auto; margin-right:auto; }
+    .repo-panels-row > .repo-panel-collapse { flex:1 1 0; min-width:0; }
+    .repo-panels-right { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:0; }
     .repo-panel-collapse .achievement-panel { margin:0; }
     .repo-panel-collapse .points-breakdown { margin-bottom:0; }
     .repo-panel-toggle { font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; color:#555; letter-spacing:3px; text-transform:uppercase; cursor:pointer; padding:10px 0; list-style:none; display:flex; align-items:center; gap:8px; }
@@ -139,7 +140,7 @@
     .repo-panel-toggle:hover::before { border-color:#7873f5; }
     @media (max-width:768px) {
       .repo-panels-row { flex-direction:column; align-items:center; }
-      .repo-panel-collapse { flex:1 1 auto; width:100%; max-width:500px; }
+      .repo-panels-row > .repo-panel-collapse, .repo-panels-right { flex:1 1 auto; width:100%; max-width:500px; }
     }
 
     /* === GITHUB LINK (repo page) === */
@@ -905,6 +906,12 @@
     .stars-revert-all-btn { display:block; width:100%; padding:10px 16px; border:1px solid rgba(239,68,68,0.35); border-radius:8px; background:rgba(239,68,68,0.08); color:#f87171; font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
     .stars-revert-all-btn:hover { background:rgba(239,68,68,0.18); border-color:rgba(239,68,68,0.5); }
     .stars-no-dupes { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#444; font-style:italic; }
+    .stars-rates { margin:10px 0 12px; border:1px solid rgba(255,255,255,0.05); border-radius:8px; overflow:hidden; }
+    .stars-rates-header { display:flex; justify-content:space-between; padding:6px 12px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; color:#555; letter-spacing:1px; text-transform:uppercase; background:rgba(255,255,255,0.03); }
+    .stars-rates-row { display:flex; justify-content:space-between; padding:4px 12px; font-family:'Rajdhani',sans-serif; font-size:0.8rem; border-top:1px solid rgba(255,255,255,0.03); }
+    .stars-rates-row span:first-child { text-transform:capitalize; font-weight:600; min-width:80px; }
+    .stars-rates-row span:nth-child(2) { color:#f87171; min-width:60px; text-align:center; }
+    .stars-rates-row span:nth-child(3) { color:#4ade80; min-width:60px; text-align:right; }
 
     /* Fullscreen card — recycle actions under Owned */
     .fs-recycle-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:10px 0 4px; }

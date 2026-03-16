@@ -824,14 +824,24 @@ function renderRepoInfo(owner, repo) {
         starsHTML = `<details class="repo-panel-collapse" id="stars-panel"><summary class="repo-panel-toggle">Stars <span class="star-balance">&starf; ${starBalance}</span></summary>
           <div class="stars-panel-body">
             <div class="stars-info">Revert duplicate cards to earn Stars. Spend Stars to cherry-pick missing cards.</div>
+            <div class="stars-rates">
+              <div class="stars-rates-header"><span>Rarity</span><span>Revert</span><span>Cherry-pick</span></div>
+              ${['common','rare','epic','legendary','mythic'].map(r => {
+                const rc = {common:'#888',rare:'#60a5fa',epic:'#c084fc',legendary:'#ffd700',mythic:'#ff0040'}[r];
+                return `<div class="stars-rates-row"><span style="color:${rc}">${r}</span><span>+${REVERT_YIELD[r]}</span><span>${CHERRY_PICK_COST[r]}</span></div>`;
+              }).join('')}
+            </div>
             ${hasDupes ? `<button class="stars-revert-all-btn" id="revert-all-btn">Git Revert All Duplicates (${dupeCount} cards)</button>` : '<div class="stars-no-dupes">No duplicate cards to revert</div>'}
           </div>
         </details>`;
       }
-      const panels = [achievementHTML ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '',
+      const leftCol = achievementHTML ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '';
+      const rightPanels = [
         breakdownHTML ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Points</summary>${breakdownHTML}</details>` : '',
-        starsHTML].filter(Boolean);
-      return panels.length ? `<div class="repo-panels-row">${panels.join('')}</div>` : '';
+        starsHTML
+      ].filter(Boolean).join('');
+      const rightCol = rightPanels ? `<div class="repo-panels-right">${rightPanels}</div>` : '';
+      return (leftCol || rightCol) ? `<div class="repo-panels-row">${leftCol}${rightCol}</div>` : '';
     })()}
     <div class="filter-bar" id="filter-bar">
       <div class="filter-group">

@@ -851,6 +851,7 @@ function renderRepoInfo(owner, repo) {
               <div class="stars-rates-totals"><span></span><span></span><span class="stars-total-revert">${totalRevertStars > 0 ? '+' + totalRevertStars + ' &starf;' : ''}</span><span></span><span class="stars-total-cherry">${totalCherryStars > 0 ? totalCherryStars + ' &starf;' : ''}</span></div>
             </div>
             ${hasDupes ? `<button class="stars-revert-all-btn" id="revert-all-btn">Revert All Duplicates (${dupeCount} cards &rarr; +${totalRevertStars} &starf;)</button>` : '<div class="stars-no-dupes">No duplicate cards to revert</div>'}
+            ${totalCherryStars > 0 && starBalance >= totalCherryStars ? `<button class="stars-cherry-all-btn" id="cherry-pick-all-btn">Cherry-pick All Missing (${perRarity.reduce((s,r) => s + r.missing, 0)} cards for ${totalCherryStars} &starf;)</button>` : ''}
           </div>
         </details>`;
       }
@@ -915,6 +916,10 @@ function renderRepoInfo(owner, repo) {
   // Wire up revert all duplicates button
   const revertAllBtn = document.getElementById('revert-all-btn');
   if (revertAllBtn) revertAllBtn.addEventListener('click', () => showRevertAllOverlay());
+
+  // Wire up cherry-pick all button
+  const cherryAllBtn = document.getElementById('cherry-pick-all-btn');
+  if (cherryAllBtn) cherryAllBtn.addEventListener('click', () => showCherryPickAllOverlay());
 
   // Wire up search input
   const searchInput = document.getElementById('card-search');
@@ -2296,6 +2301,79 @@ function showRevertAllOverlay() {
         <div class="revert-result">+${data.starsEarned} &starf; earned from ${data.cardsReverted} cards</div>
         <button class="btn-secondary" id="revert-done">Done</button>`;
       overlay.querySelector('#revert-done').addEventListener('click', () => overlay.remove());
+      await loadLibraryFromDB();
+      await loadStarBalance();
+      renderRepoInfoFromCurrent();
+      renderLibrary();
+    } catch (err) {
+      btn.textContent = 'Error: ' + err.message;
+      btn.disabled = false;
+    }
+  });
+}
+
+function showCherryPickAllOverlay() {
+  if (!_currentUser || !currentRepoName) return;
+  const [owner, repo] = currentRepoName.split('/');
+
+  const rarityOrder = ['mythic', 'legendary', 'epic', 'rare', 'common'];
+  const rarityColors = { mythic: '#ff0040', legendary: '#ffd700', epic: '#c084fc', rare: '#60a5fa', common: '#888' };
+  let totalMissing = 0;
+  let totalCost = 0;
+  const breakdown = {};
+  rarityOrder.forEach(r => { breakdown[r] = { missing: 0, cost: 0 }; });
+
+  for (const c of allContributors) {
+    if (!library[c.login]) {
+      totalMissing++;
+      const cost = CHERRY_PICK_COST[c.rarity] || 5;
+      totalCost += cost;
+      breakdown[c.rarity].missing++;
+      breakdown[c.rarity].cost += cost;
+    }
+  }
+
+  if (totalMissing === 0 || starBalance < totalCost) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'revert-all-overlay';
+  const rows = rarityOrder
+    .filter(r => breakdown[r].missing > 0)
+    .map(r => `<div class="revert-breakdown-row">
+      <span class="revert-rarity" style="color:${rarityColors[r]}">${r}</span>
+      <span class="revert-count">${breakdown[r].missing} card${breakdown[r].missing !== 1 ? 's' : ''}</span>
+      <span class="revert-stars">${breakdown[r].cost} &starf;</span>
+    </div>`).join('');
+
+  overlay.innerHTML = `<div class="revert-all-content">
+    <div class="cherry-all-title">Cherry-pick All Missing</div>
+    <div class="revert-all-desc">Spend Stars to instantly complete your collection.</div>
+    <div class="revert-breakdown">${rows}</div>
+    <div class="revert-total">${totalMissing} cards for ${totalCost} &starf; (you have ${starBalance} &starf;)</div>
+    <div class="revert-all-actions">
+      <button class="btn-secondary cherry-confirm-btn" id="cherry-all-confirm">Confirm Cherry-pick</button>
+      <button class="btn-secondary revert-cancel-btn" id="cherry-all-cancel">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#cherry-all-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#cherry-all-confirm').addEventListener('click', async () => {
+    const btn = overlay.querySelector('#cherry-all-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Cherry-picking...';
+    try {
+      const res = await fetch(`/api/recycling/${owner}/${repo}/cherry-pick-all`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Cherry-pick failed');
+      starBalance = data.newBalance ?? 0;
+      overlay.querySelector('.revert-all-content').innerHTML = `
+        <div class="cherry-all-title">Collection Complete!</div>
+        <div class="revert-result">${data.cardsAcquired} cards acquired</div>
+        <button class="btn-secondary" id="cherry-all-done">Done</button>`;
+      overlay.querySelector('#cherry-all-done').addEventListener('click', () => overlay.remove());
       await loadLibraryFromDB();
       await loadStarBalance();
       renderRepoInfoFromCurrent();

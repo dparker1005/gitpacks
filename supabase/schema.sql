@@ -398,6 +398,68 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Bulk cherry-pick: spend stars to craft all missing cards at once
+CREATE OR REPLACE FUNCTION cherry_pick_all(
+  p_user_id UUID,
+  p_owner_repo TEXT,
+  p_cards JSONB -- array of {"login": "name", "cost": N}
+) RETURNS TABLE(success BOOLEAN, new_balance INTEGER, cards_acquired INTEGER) AS $$
+DECLARE
+  card JSONB;
+  cur_balance INT;
+  total_cost INT := 0;
+  total_acquired INT := 0;
+  existing_count INT;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  FOR card IN SELECT * FROM jsonb_array_elements(p_cards)
+  LOOP
+    total_cost := total_cost + (card->>'cost')::INT;
+  END LOOP;
+
+  IF total_cost < 1 THEN
+    RETURN QUERY SELECT false, 0, 0;
+    RETURN;
+  END IF;
+
+  SELECT balance INTO cur_balance FROM user_stars
+    WHERE user_id = p_user_id AND owner_repo = p_owner_repo
+    FOR UPDATE;
+
+  IF cur_balance IS NULL OR cur_balance < total_cost THEN
+    RETURN QUERY SELECT false, COALESCE(cur_balance, 0), 0;
+    RETURN;
+  END IF;
+
+  FOR card IN SELECT * FROM jsonb_array_elements(p_cards)
+  LOOP
+    SELECT count INTO existing_count FROM user_collections
+      WHERE user_id = p_user_id AND owner_repo = p_owner_repo AND contributor_login = card->>'login';
+
+    IF existing_count IS NULL OR existing_count = 0 THEN
+      INSERT INTO user_collections (user_id, owner_repo, contributor_login, count)
+        VALUES (p_user_id, p_owner_repo, card->>'login', 1)
+        ON CONFLICT (user_id, owner_repo, contributor_login)
+        DO UPDATE SET count = user_collections.count + 1;
+      total_acquired := total_acquired + 1;
+    END IF;
+  END LOOP;
+
+  IF total_acquired > 0 THEN
+    UPDATE user_stars SET
+      balance = balance - total_cost,
+      total_spent = total_spent + total_cost,
+      updated_at = NOW()
+      WHERE user_id = p_user_id AND owner_repo = p_owner_repo;
+  END IF;
+
+  RETURN QUERY SELECT true, (cur_balance - total_cost), total_acquired;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Atomic pack decrement: returns false if no packs available (race-safe)
 CREATE OR REPLACE FUNCTION decrement_pack(
   p_user_id UUID,

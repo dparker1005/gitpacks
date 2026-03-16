@@ -131,8 +131,8 @@ CREATE POLICY "Allow insert self cards" ON user_self_cards FOR INSERT WITH CHECK
 CREATE POLICY "Users can view own achievements" ON user_achievements FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Allow insert achievements" ON user_achievements FOR INSERT WITH CHECK (true);
 
--- Collection completions: users can view own (writes via RPC only)
-CREATE POLICY "Users can view own completions" ON collection_completions FOR SELECT USING (auth.uid() = user_id);
+-- Collection completions: publicly readable (leaderboard needs cross-user access, writes via RPC only)
+CREATE POLICY "Completions are publicly readable" ON collection_completions FOR SELECT USING (true);
 
 -- Leaderboard scores: publicly readable (writes via RPC only)
 CREATE POLICY "Leaderboard is publicly readable" ON leaderboard_scores FOR SELECT USING (true);

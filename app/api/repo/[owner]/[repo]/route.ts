@@ -132,7 +132,7 @@ function getTitle(c: any, p: any, isFirstCommitter: boolean, rarity: string): st
   }
 
   if (c.inactive) {
-    return ({ mythic: 'Eternal Legend', legendary: 'Legacy Guardian', epic: 'Phantom', rare: 'Dormant', common: 'Time Capsule' } as any)[rarity];
+    return ({ mythic: 'Eternal Legend', legendary: 'The Eternal', epic: 'Cornerstone', rare: 'Foundation', common: 'Legacy' } as any)[rarity];
   }
 
   const hasNonCommitActivity = c.prsMerged > 0 || c.issues > 0;
@@ -146,7 +146,7 @@ function getTitle(c: any, p: any, isFirstCommitter: boolean, rarity: string): st
 
   const titles: any = {
     streak: { mythic: 'Unstoppable Force', legendary: 'Relentless Force', epic: 'Streak Demon', rare: 'Hot Streak', common: 'Tenacious' },
-    consistency: { mythic: 'The Immortal', legendary: 'The Eternal', epic: 'Juggernaut', rare: 'Ironclad', common: 'Clockwork' },
+    consistency: { mythic: 'The Inevitable', legendary: 'Unwavering', epic: 'Juggernaut', rare: 'Ironclad', common: 'Clockwork' },
     peak: { mythic: 'Cataclysm', legendary: 'Supernova', epic: 'Lightning Strike', rare: 'Blitz', common: 'Spark' },
     recent: { rare: 'Rising Star', common: 'Recent Contributor' },
     prs: { mythic: 'The Unbound', legendary: 'PR Overlord', epic: 'PR Titan', rare: 'PR Machine', common: 'Pull Requester' },
@@ -171,10 +171,10 @@ function getAbility(c: any, p: any, isFirstCommitter: boolean, rarity: string): 
   if (c.inactive) {
     return ({
       mythic: { name: 'Eternal Flame', desc: `${fmt(c.commits)} commits forged the foundation`, icon: '\u{1F3DB}\uFE0F', color: '#ff0040' },
-      legendary: { name: 'Immortalized', desc: `${fmt(c.commits)} commits still shaping this project`, icon: '\u{1FAA6}', color: '#c084fc' },
-      epic: { name: 'Ghost in the Code', desc: `${fmt(c.commits)} commits, then vanished`, icon: '\u{1F47B}', color: '#94a3b8' },
+      legendary: { name: 'Enshrined', desc: `${fmt(c.commits)} commits still shaping this project`, icon: '\u{1F3DB}\uFE0F', color: '#c084fc' },
+      epic: { name: 'Deep Roots', desc: 'Contributions woven into the codebase', icon: '\u{1F33F}', color: '#94a3b8' },
       rare: { name: 'Echo', desc: 'Past contributions still resonate', icon: '\u{1F50A}', color: '#60a5fa' },
-      common: { name: 'Faded', desc: 'Contributions from another time', icon: '\u2601\uFE0F', color: '#666' },
+      common: { name: 'Bedrock', desc: 'Early contributions that shaped the project', icon: '\u{1FAA8}', color: '#666' },
     } as any)[rarity];
   }
 

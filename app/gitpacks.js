@@ -269,8 +269,9 @@ async function loadPopularRepos() {
       </div>`;
       html += `</div>`;
 
-      // Right column: Completed Sets + Popular Repos
+      // Right column: Leaderboard + Completed Sets + Popular Repos
       html += `<div class="dashboard-col">`;
+      html += `<div id="leaderboard-section" class="popular-section"></div>`;
       if (completedRepos.length) {
         html += `<div class="popular-section">
           <h3 class="popular-title">Completed Sets</h3>
@@ -306,9 +307,10 @@ async function loadPopularRepos() {
       b.addEventListener('click', () => quickLoad(b.dataset.repo));
     });
 
-    // Lazy load contributed repos
+    // Lazy load contributed repos and leaderboard
     if (_currentUser) {
       loadContributedRepos(yourRepos);
+      loadLeaderboard();
     }
   } catch { /* silent */ }
 }
@@ -382,6 +384,72 @@ async function loadContributedRepos(yourRepos) {
       }
     });
   }
+}
+
+// ===== LEADERBOARD =====
+async function loadLeaderboard() {
+  const section = document.getElementById('leaderboard-section');
+  if (!section) return;
+
+  try {
+    const [lbRes, scoreRes] = await Promise.all([
+      fetch('/api/leaderboard?limit=10'),
+      _currentUser ? fetch('/api/score') : Promise.resolve(null),
+    ]);
+
+    let entries = [];
+    if (lbRes.ok) {
+      const data = await lbRes.json();
+      entries = data.entries || [];
+    }
+
+    let userScore = null;
+    if (scoreRes && scoreRes.ok) {
+      userScore = await scoreRes.json();
+    }
+
+    if (entries.length === 0 && !userScore) {
+      section.innerHTML = '';
+      return;
+    }
+
+    let html = `<h3 class="popular-title">Leaderboard</h3>`;
+
+    // User score summary
+    if (userScore && userScore.total_points > 0) {
+      html += `<div class="score-summary">
+        <div class="score-summary-points">${userScore.total_points.toLocaleString()}<span class="score-summary-label">pts</span></div>
+        <div class="score-summary-stats">
+          <span>${userScore.repos_collected} repo${userScore.repos_collected !== 1 ? 's' : ''}</span>
+          <span class="score-summary-dot">&middot;</span>
+          <span>${userScore.repos_completed} complete</span>
+        </div>
+      </div>`;
+    }
+
+    if (entries.length > 0) {
+      html += `<div class="leaderboard-list">`;
+      entries.forEach((e, i) => {
+        const rank = e.rank;
+        const isCurrentUser = _currentUser && e.github_username.toLowerCase() === _currentUser.username.toLowerCase();
+        const rankClass = rank === 1 ? 'lb-rank-1' : rank === 2 ? 'lb-rank-2' : rank === 3 ? 'lb-rank-3' : '';
+        const medalIcon = rank === 1 ? '<span class="lb-medal">&#9733;</span>' : rank === 2 ? '<span class="lb-medal">&#9733;</span>' : rank === 3 ? '<span class="lb-medal">&#9733;</span>' : '';
+
+        html += `<a href="https://github.com/${encodeURIComponent(e.github_username)}" target="_blank" rel="noopener" class="lb-row ${rankClass}${isCurrentUser ? ' lb-you' : ''}">
+          <span class="lb-rank">${medalIcon}${rank}</span>
+          <img src="${e.avatar_url}" alt="" class="lb-avatar" loading="lazy" />
+          <span class="lb-info">
+            <span class="lb-name">${e.github_username}</span>
+            <span class="lb-detail">${e.repos_completed > 0 ? e.repos_completed + ' complete' : 'collecting'}</span>
+          </span>
+          <span class="lb-points">${e.total_points.toLocaleString()}<span class="lb-pts-label">pts</span></span>
+        </a>`;
+      });
+      html += `</div>`;
+    }
+
+    section.innerHTML = html;
+  } catch { /* silent */ }
 }
 
 // Load pack state for top bar (all users)

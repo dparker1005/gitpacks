@@ -28,7 +28,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const entries = (data || []).map((row: any, i: number) => ({
+  const rows = data || [];
+
+  // For global leaderboard, fetch completed repo counts
+  let completionsMap: Record<string, number> = {};
+  if (!repo && rows.length > 0) {
+    const userIds = rows.map((r: any) => r.user_id);
+    const { data: completions } = await supabase
+      .from('collection_completions')
+      .select('user_id')
+      .in('user_id', userIds)
+      .eq('is_complete', true);
+
+    if (completions) {
+      for (const c of completions) {
+        completionsMap[c.user_id] = (completionsMap[c.user_id] || 0) + 1;
+      }
+    }
+  }
+
+  const entries = rows.map((row: any, i: number) => ({
     rank: offset + i + 1,
     github_username: row.profiles?.github_username || '',
     avatar_url: row.profiles?.avatar_url || '',
@@ -37,6 +56,7 @@ export async function GET(request: NextRequest) {
     completion_bonus: row.completion_bonus,
     unique_cards: row.unique_cards,
     total_cards_in_repo: row.total_cards_in_repo,
+    repos_completed: completionsMap[row.user_id] || 0,
   }));
 
   return NextResponse.json({

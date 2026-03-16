@@ -252,15 +252,15 @@ async function loadPopularRepos() {
         ? `<div class="repo-progress-bar"><div class="repo-progress-fill" style="width:${pctNum}%"></div></div>`
         : '';
       const bonusHTML = r.completion_bonus > 0
-        ? `<span class="repo-bonus">+${r.completion_bonus.toLocaleString()}</span>`
+        ? `<span class="repo-bonus">+${r.completion_bonus.toLocaleString()} bonus</span>`
         : '';
       const pointsHTML = r.total_points > 0
-        ? `<span class="repo-points">${r.base_points.toLocaleString()}${bonusHTML}</span>`
+        ? `<span class="repo-points">${r.base_points.toLocaleString()} pts${bonusHTML}</span>`
         : '';
-      return `<button class="popular-repo-btn${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
+      return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
           <span class="popular-repo-name">${r.name}${progressBar}</span>
-          <span class="popular-repo-meta">
-            <span class="popular-repo-progress">${r.collected}/${r.cards}</span>
+          <span class="popular-repo-meta-stacked">
+            <span class="popular-repo-progress">${r.collected}/${r.cards} cards</span>
             ${pointsHTML}
           </span>
         </button>`;

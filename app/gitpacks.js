@@ -886,9 +886,13 @@ function renderRepoInfo(owner, repo) {
       <input type="text" class="card-search" id="card-search" placeholder="Search cards..." value="${cardSearch}" />
     </div>`;
 
-  // Open achievements panel on desktop, points/stars stay closed with summaries
-  const achPanel = document.getElementById('achievements-panel');
-  if (achPanel && window.innerWidth > 768) achPanel.setAttribute('open', '');
+  // Open achievements and stars panels on desktop, points stays closed with summary
+  if (window.innerWidth > 768) {
+    const achPanel = document.getElementById('achievements-panel');
+    if (achPanel) achPanel.setAttribute('open', '');
+    const starsPanel = document.getElementById('stars-panel');
+    if (starsPanel) starsPanel.setAttribute('open', '');
+  }
 
   // Wire up open pack button
   const openPackBtn = document.getElementById('open-pack-btn');

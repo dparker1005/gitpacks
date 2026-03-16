@@ -265,6 +265,139 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- User stars (per-repo currency for card recycling)
+CREATE TABLE IF NOT EXISTS user_stars (
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  owner_repo TEXT NOT NULL,
+  balance INTEGER NOT NULL DEFAULT 0,
+  total_earned INTEGER NOT NULL DEFAULT 0,
+  total_spent INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, owner_repo)
+);
+
+ALTER TABLE user_stars ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can view own stars" ON user_stars FOR SELECT USING (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_stars_user_repo ON user_stars(user_id, owner_repo);
+
+-- Revert cards: destroy duplicates to earn stars
+CREATE OR REPLACE FUNCTION revert_cards(
+  p_user_id UUID,
+  p_owner_repo TEXT,
+  p_cards JSONB -- array of {"login": "name", "count": N, "yield": Y}
+) RETURNS INTEGER AS $$
+DECLARE
+  card JSONB;
+  cur_count INT;
+  revert_count INT;
+  card_yield INT;
+  total_stars INT := 0;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  FOR card IN SELECT * FROM jsonb_array_elements(p_cards)
+  LOOP
+    revert_count := (card->>'count')::INT;
+    card_yield := (card->>'yield')::INT;
+
+    IF revert_count < 1 OR card_yield < 1 THEN
+      CONTINUE;
+    END IF;
+
+    -- Lock the row and check count
+    SELECT count INTO cur_count FROM user_collections
+      WHERE user_id = p_user_id AND owner_repo = p_owner_repo AND contributor_login = card->>'login'
+      FOR UPDATE;
+
+    IF cur_count IS NULL OR cur_count <= 1 THEN
+      CONTINUE; -- Can't revert below 1
+    END IF;
+
+    -- Clamp revert_count so we never go below 1
+    IF revert_count > cur_count - 1 THEN
+      revert_count := cur_count - 1;
+    END IF;
+
+    UPDATE user_collections
+      SET count = count - revert_count
+      WHERE user_id = p_user_id AND owner_repo = p_owner_repo AND contributor_login = card->>'login';
+
+    total_stars := total_stars + (revert_count * card_yield);
+  END LOOP;
+
+  -- Credit stars
+  IF total_stars > 0 THEN
+    INSERT INTO user_stars (user_id, owner_repo, balance, total_earned, total_spent, updated_at)
+      VALUES (p_user_id, p_owner_repo, total_stars, total_stars, 0, NOW())
+      ON CONFLICT (user_id, owner_repo) DO UPDATE SET
+        balance = user_stars.balance + total_stars,
+        total_earned = user_stars.total_earned + total_stars,
+        updated_at = NOW();
+  END IF;
+
+  RETURN total_stars;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cherry-pick card: spend stars to craft a missing card
+CREATE OR REPLACE FUNCTION cherry_pick_card(
+  p_user_id UUID,
+  p_owner_repo TEXT,
+  p_login TEXT,
+  p_cost INTEGER
+) RETURNS TABLE(success BOOLEAN, new_balance INTEGER) AS $$
+DECLARE
+  cur_balance INT;
+  existing_count INT;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  IF p_cost < 1 THEN
+    RETURN QUERY SELECT false, 0;
+    RETURN;
+  END IF;
+
+  -- Check card not already owned
+  SELECT count INTO existing_count FROM user_collections
+    WHERE user_id = p_user_id AND owner_repo = p_owner_repo AND contributor_login = p_login;
+
+  IF existing_count IS NOT NULL AND existing_count > 0 THEN
+    RETURN QUERY SELECT false, -1; -- -1 signals already owned
+    RETURN;
+  END IF;
+
+  -- Lock and check balance
+  SELECT balance INTO cur_balance FROM user_stars
+    WHERE user_id = p_user_id AND owner_repo = p_owner_repo
+    FOR UPDATE;
+
+  IF cur_balance IS NULL OR cur_balance < p_cost THEN
+    RETURN QUERY SELECT false, COALESCE(cur_balance, 0);
+    RETURN;
+  END IF;
+
+  -- Deduct stars
+  UPDATE user_stars SET
+    balance = balance - p_cost,
+    total_spent = total_spent + p_cost,
+    updated_at = NOW()
+    WHERE user_id = p_user_id AND owner_repo = p_owner_repo;
+
+  -- Grant the card
+  INSERT INTO user_collections (user_id, owner_repo, contributor_login, count)
+    VALUES (p_user_id, p_owner_repo, p_login, 1)
+    ON CONFLICT (user_id, owner_repo, contributor_login)
+    DO UPDATE SET count = user_collections.count + 1;
+
+  RETURN QUERY SELECT true, (cur_balance - p_cost);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Atomic pack decrement: returns false if no packs available (race-safe)
 CREATE OR REPLACE FUNCTION decrement_pack(
   p_user_id UUID,

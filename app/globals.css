@@ -897,3 +897,30 @@
       .welcome-content { padding:30px 20px; }
       .welcome-title { font-size:1.2rem; }
     }
+
+    /* === CARD RECYCLING (Stars / Revert / Cherry-pick) === */
+    .star-balance { display:inline-block; margin-left:12px; color:#ffd700; font-family:'Orbitron',sans-serif; font-size:0.75rem; font-weight:700; letter-spacing:1px; }
+    .revert-all-btn { background:rgba(239,68,68,0.15) !important; border-color:rgba(239,68,68,0.4) !important; color:#f87171 !important; }
+    .revert-all-btn:hover { background:rgba(239,68,68,0.25) !important; border-color:rgba(239,68,68,0.6) !important; }
+    .revert-btn { background:rgba(239,68,68,0.15) !important; border-color:rgba(239,68,68,0.4) !important; color:#f87171 !important; }
+    .revert-btn:hover { background:rgba(239,68,68,0.25) !important; border-color:rgba(239,68,68,0.6) !important; }
+    .cherry-pick-btn { margin-top:8px; padding:10px 24px; border:1.5px solid rgba(34,197,94,0.5); border-radius:8px; background:rgba(34,197,94,0.15); color:#4ade80; font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+    .cherry-pick-btn:hover { background:rgba(34,197,94,0.25); border-color:rgba(34,197,94,0.7); transform:translateY(-1px); }
+    .cherry-pick-btn:disabled { opacity:0.35; cursor:default; transform:none; }
+
+    /* Revert all overlay */
+    .revert-all-overlay { position:fixed; inset:0; z-index:9500; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.92); backdrop-filter:blur(12px); animation:fadeIn 0.3s ease; }
+    .revert-all-content { text-align:center; max-width:420px; padding:40px 30px; }
+    .revert-all-title { font-family:'Orbitron',sans-serif; font-size:1.2rem; font-weight:900; letter-spacing:2px; text-transform:uppercase; background:linear-gradient(135deg,#f87171,#ffd700); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-bottom:16px; }
+    .revert-all-desc { font-family:'Rajdhani',sans-serif; font-size:0.95rem; color:#888; margin-bottom:20px; }
+    .revert-breakdown { text-align:left; margin:0 auto 16px; max-width:280px; }
+    .revert-breakdown-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.05); font-family:'Rajdhani',sans-serif; font-size:0.9rem; }
+    .revert-rarity { text-transform:capitalize; font-weight:600; min-width:90px; }
+    .revert-count { color:#888; min-width:80px; text-align:center; }
+    .revert-stars { color:#ffd700; font-weight:700; min-width:70px; text-align:right; }
+    .revert-total { font-family:'Orbitron',sans-serif; font-size:0.85rem; color:#ffd700; font-weight:700; letter-spacing:1px; margin:16px 0 20px; }
+    .revert-result { font-family:'Orbitron',sans-serif; font-size:0.9rem; color:#ffd700; font-weight:700; letter-spacing:1px; margin:20px 0; }
+    .revert-all-actions { display:flex; gap:12px; justify-content:center; }
+    .revert-confirm-btn { background:rgba(239,68,68,0.2) !important; border-color:rgba(239,68,68,0.5) !important; color:#f87171 !important; }
+    .revert-confirm-btn:hover { background:rgba(239,68,68,0.35) !important; }
+    .revert-cancel-btn { color:#888 !important; }

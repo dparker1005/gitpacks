@@ -42,6 +42,7 @@ let packState = null; // { readyPacks, maxPacks, nextRegenAt }
 let packCountdownInterval = null;
 let guestPacksRemaining = 5; // for logged-out users
 let lastAchievementData = null; // achievement data for current repo
+let starBalance = 0; // per-repo star balance for card recycling
 
 // Global space handler — only one at a time, avoids stacking conflicts
 let _spaceAction = null;
@@ -475,7 +476,7 @@ async function loadLeaderboard() {
         const rank = e.rank;
         const isCurrentUser = _currentUser && e.github_username.toLowerCase() === _currentUser.username.toLowerCase();
         const rankClass = rank === 1 ? 'lb-rank-1' : rank === 2 ? 'lb-rank-2' : rank === 3 ? 'lb-rank-3' : '';
-        const medalIcon = rank === 1 ? '<span class="lb-medal">&#9733;</span>' : rank === 2 ? '<span class="lb-medal">&#9733;</span>' : rank === 3 ? '<span class="lb-medal">&#9733;</span>' : '';
+        const medalIcon = rank === 1 ? '<span class="lb-medal">🥇</span>' : rank === 2 ? '<span class="lb-medal">🥈</span>' : rank === 3 ? '<span class="lb-medal">🥉</span>' : '';
 
         html += `<a href="https://github.com/${encodeURIComponent(e.github_username)}" target="_blank" rel="noopener" class="lb-row ${rankClass}${isCurrentUser ? ' lb-you' : ''}">
           <span class="lb-rank">${medalIcon}${rank}</span>
@@ -534,6 +535,21 @@ async function loadLibraryFromDB() {
   } catch { /* fall back to localStorage */ }
 }
 
+async function loadStarBalance() {
+  if (!_currentUser || !currentRepoName) { starBalance = 0; return; }
+  const [owner, repo] = currentRepoName.split('/');
+  try {
+    const res = await fetch(`/api/recycling/${owner}/${repo}/stars`);
+    if (res.ok) {
+      const data = await res.json();
+      starBalance = data.balance || 0;
+    } else { starBalance = 0; }
+  } catch { starBalance = 0; }
+}
+
+const REVERT_YIELD = { common: 1, rare: 3, epic: 10, legendary: 30, mythic: 100 };
+const CHERRY_PICK_COST = { common: 5, rare: 15, epic: 50, legendary: 150, mythic: 500 };
+
 async function loadRepo() {
   const repoInput = input.value.trim().replace(/^https?:\/\/github\.com\//, '');
   const match = repoInput.match(/^([^/]+)\/([^/]+)/);
@@ -567,9 +583,10 @@ async function loadRepo() {
       loadLibrary();
     }
 
-    // Load pack state for logged-in users
+    // Load pack state and star balance for logged-in users
     if (_currentUser) {
       await loadPackState();
+      await loadStarBalance();
     }
 
     // Check achievements for logged-in users
@@ -788,7 +805,7 @@ function renderRepoInfo(owner, repo) {
         <h2><span>${owner || ''}</span> / <span>${repo || ''}</span></h2>
         ${ghLink}
         <div class="repo-info-sep"></div>
-        <div class="collection-progress"><span>${collected}</span> / <span>${total}</span> collected</div>
+        <div class="collection-progress"><span>${collected}</span> / <span>${total}</span> collected${_currentUser ? `<span class="star-balance">&starf; ${starBalance} Stars</span>` : ''}</div>
       </div>
       <button class="switch-repo-btn" id="switch-repo-btn">Switch Repo</button>
     </div>
@@ -796,6 +813,7 @@ function renderRepoInfo(owner, repo) {
     <div class="repo-action-row">
       <div class="action-buttons">
         <button class="btn-secondary" id="open-pack-btn" ${total === 0 ? 'disabled' : ''} ${_currentUser && packState && packState.readyPacks <= 0 ? 'disabled' : ''} ${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'disabled' : ''}>${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'Sign In to Open Packs' : 'Open Pack'}</button>
+        ${_currentUser && Object.values(library).some(c => c > 1) ? `<button class="btn-secondary revert-all-btn" id="revert-all-btn">Git Revert All Duplicates</button>` : ''}
         ${packHTML}
       </div>
     </div>
@@ -842,6 +860,10 @@ function renderRepoInfo(owner, repo) {
   // Wire up open pack button
   const openPackBtn = document.getElementById('open-pack-btn');
   if (openPackBtn) openPackBtn.addEventListener('click', () => openPack());
+
+  // Wire up revert all duplicates button
+  const revertAllBtn = document.getElementById('revert-all-btn');
+  if (revertAllBtn) revertAllBtn.addEventListener('click', () => showRevertAllOverlay());
 
   // Wire up search input
   const searchInput = document.getElementById('card-search');
@@ -1918,7 +1940,9 @@ function openFullscreenCard(c) {
         <button class="share-action-btn" id="fs-copy-link">Copy Link</button>
         <a class="share-action-btn" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out my GitPacks card for ${currentRepoName}!`)}&url=${encodeURIComponent(`${window.location.origin}/card/${currentRepoName}/${c.login}`)}" target="_blank" rel="noopener">Share on X</a>
         <button class="share-action-btn" id="fs-copy-md">Copy for README</button>
+        ${_currentUser && !isGhost && (library[c.login] || 0) > 1 ? `<button class="share-action-btn revert-btn" id="fs-revert">Revert (+${REVERT_YIELD[c.rarity] || 1} &starf;)</button>` : ''}
       </div>
+      ${_currentUser && isGhost ? `<button class="cherry-pick-btn" id="fs-cherry-pick" ${starBalance < (CHERRY_PICK_COST[c.rarity] || 999) ? 'disabled' : ''}>Cherry-pick (${CHERRY_PICK_COST[c.rarity] || '?'} &starf;)</button>` : ''}
     </div>`;
   document.body.appendChild(overlay);
 
@@ -1965,11 +1989,176 @@ function openFullscreenCard(c) {
       setTimeout(() => { copyMdBtn.textContent = 'Copy for README'; }, 2000);
     });
   });
+
+  // Revert button
+  const revertBtn = overlay.querySelector('#fs-revert');
+  if (revertBtn) revertBtn.addEventListener('click', async () => {
+    revertBtn.disabled = true;
+    revertBtn.textContent = 'Reverting...';
+    const result = await revertSingleCard(c);
+    if (result) {
+      const newCount = library[c.login] || 0;
+      revertBtn.textContent = `+${result.starsEarned} \u2605 earned`;
+      // Update owned count in stats panel
+      const ownedEl = overlay.querySelector('.fs-stat-row:last-child .fs-stat-value');
+      if (ownedEl) ownedEl.textContent = newCount + 'x';
+      // Hide revert button if no more duplicates
+      if (newCount <= 1) {
+        setTimeout(() => revertBtn.remove(), 1000);
+      } else {
+        setTimeout(() => { revertBtn.textContent = `Revert (+${REVERT_YIELD[c.rarity] || 1} \u2605)`; revertBtn.disabled = false; }, 1000);
+      }
+      renderRepoInfoFromCurrent();
+      renderLibrary();
+    } else {
+      revertBtn.textContent = 'Error';
+      setTimeout(() => { revertBtn.textContent = `Revert (+${REVERT_YIELD[c.rarity] || 1} \u2605)`; revertBtn.disabled = false; }, 2000);
+    }
+  });
+
+  // Cherry-pick button
+  const cherryBtn = overlay.querySelector('#fs-cherry-pick');
+  if (cherryBtn) cherryBtn.addEventListener('click', async () => {
+    cherryBtn.disabled = true;
+    cherryBtn.textContent = 'Cherry-picking...';
+    const result = await cherryPickCard(c);
+    if (result) {
+      cherryBtn.textContent = 'Card acquired!';
+      // Remove ghost styling
+      overlay.classList.remove('fullscreen-ghost');
+      setTimeout(() => { closeOverlay(); renderRepoInfoFromCurrent(); renderLibrary(); }, 1200);
+    } else {
+      cherryBtn.textContent = 'Failed';
+      setTimeout(() => { cherryBtn.textContent = `Cherry-pick (${CHERRY_PICK_COST[c.rarity] || '?'} \u2605)`; cherryBtn.disabled = starBalance < (CHERRY_PICK_COST[c.rarity] || 999); }, 2000);
+    }
+  });
 }
 
 function fmt(n) { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return n.toString(); }
 function rarityColor(r) { return {mythic:'#ff0040',legendary:'#ffd700',epic:'#c084fc',rare:'#60a5fa',common:'#888'}[r]||'#888'; }
 function powerGrad(r) { return {mythic:'linear-gradient(90deg,#ff0040,#ff6600,#ff00ff)',legendary:'linear-gradient(90deg,#ffd700,#ff6ec7)',epic:'linear-gradient(90deg,#a855f7,#6366f1)',rare:'linear-gradient(90deg,#3b82f6,#06b6d4)',common:'linear-gradient(90deg,#555,#777)'}[r]||'linear-gradient(90deg,#555,#777)'; }
+
+// ===== CARD RECYCLING =====
+function showRevertAllOverlay() {
+  if (!_currentUser || !currentRepoName) return;
+  const [owner, repo] = currentRepoName.split('/');
+
+  // Compute breakdown
+  const rarityOrder = ['mythic', 'legendary', 'epic', 'rare', 'common'];
+  const rarityColors = { mythic: '#ff0040', legendary: '#ffd700', epic: '#c084fc', rare: '#60a5fa', common: '#888' };
+  let totalDupes = 0;
+  let totalStars = 0;
+  const breakdown = {};
+  rarityOrder.forEach(r => { breakdown[r] = { dupes: 0, stars: 0 }; });
+
+  for (const c of allContributors) {
+    const count = library[c.login] || 0;
+    if (count > 1) {
+      const dupes = count - 1;
+      totalDupes += dupes;
+      const stars = dupes * (REVERT_YIELD[c.rarity] || 1);
+      totalStars += stars;
+      breakdown[c.rarity].dupes += dupes;
+      breakdown[c.rarity].stars += stars;
+    }
+  }
+
+  if (totalDupes === 0) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'revert-all-overlay';
+  const rows = rarityOrder
+    .filter(r => breakdown[r].dupes > 0)
+    .map(r => `<div class="revert-breakdown-row">
+      <span class="revert-rarity" style="color:${rarityColors[r]}">${r}</span>
+      <span class="revert-count">${breakdown[r].dupes} card${breakdown[r].dupes !== 1 ? 's' : ''}</span>
+      <span class="revert-stars">+${breakdown[r].stars} &starf;</span>
+    </div>`).join('');
+
+  overlay.innerHTML = `<div class="revert-all-content">
+    <div class="revert-all-title">Git Revert All Duplicates</div>
+    <div class="revert-all-desc">Destroy all duplicate cards (keeping 1 of each) to earn Stars.</div>
+    <div class="revert-breakdown">${rows}</div>
+    <div class="revert-total">${totalDupes} cards &rarr; ${totalStars} &starf;</div>
+    <div class="revert-all-actions">
+      <button class="btn-secondary revert-confirm-btn" id="revert-confirm">Confirm Revert</button>
+      <button class="btn-secondary revert-cancel-btn" id="revert-cancel">Cancel</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.querySelector('#revert-cancel').addEventListener('click', () => overlay.remove());
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+  overlay.querySelector('#revert-confirm').addEventListener('click', async () => {
+    const btn = overlay.querySelector('#revert-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Reverting...';
+    try {
+      const res = await fetch(`/api/recycling/${owner}/${repo}/revert-all`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Revert failed');
+      starBalance += data.starsEarned || 0;
+      overlay.querySelector('.revert-all-content').innerHTML = `
+        <div class="revert-all-title">Revert Complete!</div>
+        <div class="revert-result">+${data.starsEarned} &starf; earned from ${data.cardsReverted} cards</div>
+        <button class="btn-secondary" id="revert-done">Done</button>`;
+      overlay.querySelector('#revert-done').addEventListener('click', () => overlay.remove());
+      await loadLibraryFromDB();
+      await loadStarBalance();
+      renderRepoInfoFromCurrent();
+      renderLibrary();
+    } catch (err) {
+      btn.textContent = 'Error: ' + err.message;
+      btn.disabled = false;
+    }
+  });
+}
+
+async function revertSingleCard(c) {
+  if (!_currentUser || !currentRepoName) return;
+  const [owner, repo] = currentRepoName.split('/');
+  const yld = REVERT_YIELD[c.rarity] || 1;
+  try {
+    const res = await fetch(`/api/recycling/${owner}/${repo}/revert`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cards: [{ login: c.login, count: 1 }] }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Revert failed');
+    // Update local state inline
+    if (library[c.login]) library[c.login]--;
+    starBalance += data.starsEarned || 0;
+    saveLibrary();
+    return { starsEarned: data.starsEarned || 0 };
+  } catch (err) {
+    console.error('Revert error:', err);
+    return null;
+  }
+}
+
+async function cherryPickCard(c) {
+  if (!_currentUser || !currentRepoName) return;
+  const [owner, repo] = currentRepoName.split('/');
+  try {
+    const res = await fetch(`/api/recycling/${owner}/${repo}/cherry-pick`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login: c.login }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Cherry-pick failed');
+    // Update local state
+    library[c.login] = (library[c.login] || 0) + 1;
+    starBalance = data.newBalance;
+    saveLibrary();
+    return { success: true, newBalance: data.newBalance };
+  } catch (err) {
+    console.error('Cherry-pick error:', err);
+    return null;
+  }
+}
 
 // Expose functions used by inline onclick handlers in dynamically generated HTML
 window.openPack = openPack;
@@ -1977,6 +2166,7 @@ window.setFilter = setFilter;
 window.setViewMode = setViewMode;
 window.setSortBy = setSortBy;
 window.quickLoad = quickLoad;
+window.revertAllDuplicates = showRevertAllOverlay;
 
 function buildGalleryCard(c, idx, total) {
   const rc = rarityColor(c.rarity);

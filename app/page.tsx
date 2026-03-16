@@ -139,7 +139,7 @@ export default function Home() {
             <div className="landing-step">
               <div className="landing-step-num">2</div>
               <h3>Complete your collection</h3>
-              <p>Collect every contributor for a repo. Earn free packs by contributing to repos on GitHub.</p>
+              <p>Collect every contributor for a repo. Contribute to a repo and get your own card for free, plus earn bonus packs for your milestones.</p>
             </div>
             <div className="landing-step">
               <div className="landing-step-num">3</div>

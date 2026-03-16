@@ -246,8 +246,10 @@
     .card-search:focus { border-color:#7873f5; }
     .card-search::placeholder { color:#555; }
     @media (max-width:600px) {
-      .filter-group + .filter-group { border-left:none; padding-left:4px; }
-      .filter-group { justify-content:center; }
+      .filter-bar { padding:0 8px; }
+      .filter-group + .filter-group { border-left:none; padding-left:0; }
+      .filter-group { justify-content:center; flex-wrap:wrap; }
+      .filter-btn { padding:5px 10px; font-size:0.5rem; letter-spacing:1px; }
     }
 
     /* === GALLERY CARDS === */

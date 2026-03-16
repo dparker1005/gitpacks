@@ -129,6 +129,30 @@ export default function Home() {
               Sign In with GitHub
             </button>
           </div>
+
+          <div className="landing-features">
+            <div className="landing-feature">
+              <div className="landing-feature-icon">&#127183;</div>
+              <h3>5 Rarities</h3>
+              <p>Common, Rare, Epic, Legendary, and Mythic cards based on real contribution data</p>
+            </div>
+            <div className="landing-feature">
+              <div className="landing-feature-icon">&#11088;</div>
+              <h3>Stars &amp; Recycling</h3>
+              <p>Revert duplicates to earn Stars, then cherry-pick the exact cards you need</p>
+            </div>
+            <div className="landing-feature">
+              <div className="landing-feature-icon">&#127942;</div>
+              <h3>Achievements</h3>
+              <p>Contribute to repos and claim milestone packs for your commits, PRs, and streaks</p>
+            </div>
+            <div className="landing-feature">
+              <div className="landing-feature-icon">&#127941;</div>
+              <h3>Leaderboard</h3>
+              <p>Earn points for every card collected, with a 1.5x bonus for completing a repo</p>
+            </div>
+          </div>
+
           <div className="landing-steps">
             <div className="landing-step">
               <div className="landing-step-num">1</div>
@@ -143,11 +167,16 @@ export default function Home() {
             <div className="landing-step">
               <div className="landing-step-num">3</div>
               <h3>Complete your collection</h3>
-              <p>Collect all contributors — mythic cards are the rarest at just 1% per card</p>
+              <p>Collect all contributors and climb the leaderboard</p>
             </div>
           </div>
+
+          <div className="landing-starter">
+            <p>You get <strong>10 free packs</strong> when you sign up + packs regenerate over time</p>
+          </div>
+
           <div className="landing-try">
-            <p>Or try it first — browse repos below</p>
+            <p>Or try it first — open 5 guest packs on any repo below</p>
           </div>
         </div>
       )}

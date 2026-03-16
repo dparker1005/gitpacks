@@ -331,7 +331,9 @@ async function loadPopularRepos() {
 
       html += `</div>`; // close .dashboard
     } else {
-      // Logged-out layout: single "Your Collection" + Popular
+      // Logged-out layout: two-column with collection/popular left, leaderboard right
+      html += `<div class="dashboard">`;
+      html += `<div class="dashboard-col">`;
       if (yourRepos.length) {
         html += `<div class="popular-section">
           <h3 class="popular-title">Your Collection</h3>
@@ -344,6 +346,9 @@ async function loadPopularRepos() {
           <div class="popular-grid">${otherRepos.map(r => repoBtn(r, false)).join('')}</div>
         </div>`;
       }
+      html += `</div>`;
+      html += `<div class="dashboard-col"><div id="leaderboard-section" class="popular-section"></div></div>`;
+      html += `</div>`;
     }
     popularRepos.innerHTML = html;
     popularRepos.querySelectorAll('.popular-repo-btn').forEach(b => {
@@ -351,9 +356,9 @@ async function loadPopularRepos() {
     });
 
     // Lazy load contributed repos and leaderboard
+    loadLeaderboard();
     if (_currentUser) {
       loadContributedRepos(yourRepos);
-      loadLeaderboard();
     }
   } catch { /* silent */ }
 }
@@ -821,7 +826,7 @@ function renderRepoInfo(owner, repo) {
       if (_currentUser) {
         const hasDupes = Object.values(library).some(c => c > 1);
         const dupeCount = Object.values(library).reduce((sum, c) => sum + Math.max(0, c - 1), 0);
-        starsHTML = `<details class="repo-panel-collapse" id="stars-panel"><summary class="repo-panel-toggle">Stars <span class="star-balance">&starf; ${starBalance}</span></summary>
+        starsHTML = `<details class="repo-panel-collapse" id="stars-panel"><summary class="repo-panel-toggle">Stars <span class="panel-summary">&starf; ${starBalance}${hasDupes ? ` &middot; ${dupeCount} dupe${dupeCount !== 1 ? 's' : ''} to revert` : ' &middot; revert dupes, cherry-pick cards'}</span></summary>
           <div class="stars-panel-body">
             <div class="stars-info">Revert duplicate cards to earn Stars. Spend Stars to cherry-pick missing cards.</div>
             <div class="stars-rates">
@@ -836,8 +841,14 @@ function renderRepoInfo(owner, repo) {
         </details>`;
       }
       const leftCol = achievementHTML ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '';
+      const pointsTotal = breakdownHTML ? (() => {
+        let tb = 0;
+        rarityOrder.forEach(r => { tb += allContributors.filter(c => c.rarity === r && library[c.login]).length * rarityPts[r]; });
+        const cb = isComplete ? Math.floor(tb * 0.5) : 0;
+        return tb + cb;
+      })() : 0;
       const rightPanels = [
-        breakdownHTML ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Points</summary>${breakdownHTML}</details>` : '',
+        breakdownHTML ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Points <span class="panel-summary">${pointsTotal.toLocaleString()} pts${!isComplete ? ' &middot; 1.5x bonus at completion' : ' &middot; 1.5x bonus active'}</span></summary>${breakdownHTML}</details>` : '',
         starsHTML
       ].filter(Boolean).join('');
       const rightCol = rightPanels ? `<div class="repo-panels-right">${rightPanels}</div>` : '';
@@ -875,10 +886,9 @@ function renderRepoInfo(owner, repo) {
       <input type="text" class="card-search" id="card-search" placeholder="Search cards..." value="${cardSearch}" />
     </div>`;
 
-  // Open panels on desktop, closed on mobile
-  document.querySelectorAll('.repo-panel-collapse').forEach(el => {
-    if (window.innerWidth > 768) el.setAttribute('open', '');
-  });
+  // Open achievements panel on desktop, points/stars stay closed with summaries
+  const achPanel = document.getElementById('achievements-panel');
+  if (achPanel && window.innerWidth > 768) achPanel.setAttribute('open', '');
 
   // Wire up open pack button
   const openPackBtn = document.getElementById('open-pack-btn');
@@ -2094,14 +2104,108 @@ function openFullscreenCard(c) {
     cherryBtn.textContent = 'Cherry-picking...';
     const result = await cherryPickCard(c);
     if (result) {
-      cherryBtn.textContent = 'Card acquired!';
-      overlay.classList.remove('fullscreen-ghost');
-      setTimeout(() => { closeOverlay(); renderRepoInfoFromCurrent(); renderLibrary(); }, 1200);
+      closeOverlay();
+      showCherryPickReveal(c, () => { renderRepoInfoFromCurrent(); renderLibrary(); });
     } else {
       cherryBtn.textContent = 'Failed';
       setTimeout(() => { cherryBtn.textContent = `Cherry-pick (${CHERRY_PICK_COST[c.rarity] || '?'} \u2605)`; cherryBtn.disabled = starBalance < (CHERRY_PICK_COST[c.rarity] || 999); }, 2000);
     }
   });
+}
+
+function showCherryPickReveal(contributor, onDone) {
+  const overlay = document.createElement('div');
+  overlay.className = 'self-card-overlay';
+
+  const cardNum = allContributors.indexOf(contributor) + 1;
+  const cardHTML = buildGalleryCard(contributor, cardNum, allContributors.length);
+
+  overlay.innerHTML = `
+    <button class="pack-close-btn" id="cherry-reveal-close">&times;</button>
+    <div class="self-card-container">
+      <div class="self-card-message">Cherry-picked!</div>
+      <div class="self-card-slot">
+        <div class="rarity-glow"></div>
+        <div class="reveal-card">
+          <div class="reveal-card-back">
+            <div class="reveal-card-back-logo">${GP_ICON}</div>
+            <div class="reveal-card-back-repo"><span class="repo-owner">${currentRepoName.split('/')[0]}</span><span class="repo-name">${currentRepoName.split('/')[1] || ''}</span></div>
+            <div class="reveal-card-back-brand">GitPacks</div>
+          </div>
+          <div class="reveal-card-front">
+            <div class="card-wrapper" data-rarity="${contributor.rarity}" style="opacity:1">${cardHTML}</div>
+          </div>
+        </div>
+      </div>
+      <div class="self-card-subtitle">${contributor.login} added to your collection</div>
+      <button class="btn-primary self-card-continue" id="cherry-reveal-continue">Continue</button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  const slot = overlay.querySelector('.self-card-slot');
+  const cw = slot.querySelector('.reveal-card-front .card-wrapper');
+  if (cw) {
+    const slotW = slot.offsetWidth || 220;
+    const slotH = slot.offsetHeight || 340;
+    const cardScale = Math.min(slotW / 320, slotH / 480);
+    cw.style.transform = `scale(${cardScale})`;
+  }
+
+  slot.classList.add('unflipped');
+  const card = slot.querySelector('.reveal-card');
+  const rarity = contributor.rarity;
+
+  setTimeout(() => {
+    slot.classList.remove('unflipped');
+    card.classList.add('flip-' + rarity);
+
+    const glowDelay = { common:400, rare:600, epic:800, legendary:1000, mythic:1400 }[rarity] || 400;
+    setTimeout(() => {
+      if (rarity !== 'common') slot.classList.add('revealed');
+    }, glowDelay * 0.5);
+
+    if (rarity === 'mythic') {
+      overlay.classList.add('shake-screen');
+      setTimeout(() => overlay.classList.remove('shake-screen'), 600);
+      slot.insertAdjacentHTML('beforeend', '<div class="mythic-flash"></div><div class="mythic-ring"></div>');
+      let particles = '<div class="leg-particles">';
+      const colors = ['#ff0040','#ff6600','#fff','#ff00ff'];
+      for (let i = 0; i < 20; i++) {
+        const angle = (Math.PI * 2 / 20) * i;
+        const dist = 80 + Math.random() * 120;
+        particles += `<div class="leg-particle" style="width:5px;height:5px;background:${colors[Math.floor(Math.random() * colors.length)]};--px:${Math.cos(angle) * dist}px;--py:${Math.sin(angle) * dist}px;--pdur:${0.8 + Math.random() * 0.6}s;--pdelay:${Math.random() * 0.2}s"></div>`;
+      }
+      slot.insertAdjacentHTML('beforeend', particles + '</div>');
+    } else if (rarity === 'legendary') {
+      overlay.classList.add('shake-screen');
+      setTimeout(() => overlay.classList.remove('shake-screen'), 500);
+      slot.insertAdjacentHTML('beforeend', '<div class="legendary-flash"></div><div class="legendary-ring"></div>');
+      let particles = '<div class="leg-particles">';
+      const colors = ['#ffd700','#ff6ec7','#fff'];
+      for (let i = 0; i < 15; i++) {
+        const angle = (Math.PI * 2 / 15) * i;
+        const dist = 60 + Math.random() * 100;
+        particles += `<div class="leg-particle" style="width:4px;height:4px;background:${colors[Math.floor(Math.random() * colors.length)]};--px:${Math.cos(angle) * dist}px;--py:${Math.sin(angle) * dist}px;--pdur:${0.6 + Math.random() * 0.5}s;--pdelay:${Math.random() * 0.2}s"></div>`;
+      }
+      slot.insertAdjacentHTML('beforeend', particles + '</div>');
+    } else if (rarity === 'epic') {
+      slot.insertAdjacentHTML('beforeend', '<div class="epic-flash"></div><div class="epic-ring"></div>');
+    } else if (rarity === 'rare') {
+      slot.insertAdjacentHTML('beforeend', '<div class="rare-flash"></div>');
+    }
+  }, 800);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener('keydown', escHandler);
+    if (onDone) onDone();
+  }
+
+  const escHandler = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', escHandler);
+  overlay.querySelector('#cherry-reveal-close').addEventListener('click', close);
+  overlay.querySelector('#cherry-reveal-continue').addEventListener('click', close);
 }
 
 function fmt(n) { if (n >= 1e6) return (n/1e6).toFixed(1)+'M'; if (n >= 1e3) return (n/1e3).toFixed(1)+'K'; return n.toString(); }

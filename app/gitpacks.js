@@ -242,45 +242,83 @@ async function loadPopularRepos() {
         </button>`;
     }
 
+    function repoBtnScored(r, showProgressBar) {
+      const pctNum = Math.round(r.pct * 100);
+      const isComplete = r.cards > 0 && r.collected >= r.cards;
+      const progressBar = showProgressBar && !isComplete && r.cards > 0
+        ? `<div class="repo-progress-bar"><div class="repo-progress-fill" style="width:${pctNum}%"></div></div>`
+        : '';
+      const bonusHTML = r.completion_bonus > 0
+        ? `<span class="repo-bonus">+${r.completion_bonus.toLocaleString()}</span>`
+        : '';
+      const pointsHTML = r.total_points > 0
+        ? `<span class="repo-points">${r.base_points.toLocaleString()}${bonusHTML}</span>`
+        : '';
+      return `<button class="popular-repo-btn${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
+          <span class="popular-repo-name">${r.name}${progressBar}</span>
+          <span class="popular-repo-meta">
+            <span class="popular-repo-progress">${r.collected}/${r.cards}</span>
+            ${pointsHTML}
+          </span>
+        </button>`;
+    }
+
     let html = '';
 
     if (_currentUser) {
-      // Dashboard layout for logged-in users — multi-column grid
+      // Dashboard layout for logged-in users
       html += `<div class="dashboard">`;
 
-      // Left column: In Progress + Contributed repos (async, at bottom so loading doesn't shift)
+      // Left column: Your Collection (in progress + completed with points) + contributed repos
       html += `<div class="dashboard-col">`;
+
+      const hasCollection = inProgressRepos.length || completedRepos.length;
+
       if (inProgressRepos.length) {
         html += `<div class="popular-section">
           <h3 class="popular-title">In Progress</h3>
-          <div class="popular-grid">${inProgressRepos.map(r => repoBtn(r, true)).join('')}</div>
+          <div class="popular-grid">${inProgressRepos.map(r => repoBtnScored(r, true)).join('')}</div>
         </div>`;
       }
-      if (!inProgressRepos.length && !completedRepos.length) {
+
+      if (completedRepos.length) {
+        html += `<div class="popular-section">
+          <h3 class="popular-title">Completed</h3>
+          <div class="popular-grid">${completedRepos.map(r => repoBtnScored(r, false)).join('')}</div>
+        </div>`;
+      }
+
+      if (!hasCollection) {
         html += `<div class="popular-section">
           <h3 class="popular-title">Your Collection</h3>
           <p class="popular-hint">Open packs on any repo to start collecting!</p>
         </div>`;
       }
-      // Contributed repos load async — placed at bottom of column to avoid layout shift
+
+      // Score total
+      const totalPoints = yourRepos.reduce((sum, r) => sum + (r.total_points || 0), 0);
+      if (totalPoints > 0) {
+        const totalBase = yourRepos.reduce((sum, r) => sum + (r.base_points || 0), 0);
+        const totalBonus = yourRepos.reduce((sum, r) => sum + (r.completion_bonus || 0), 0);
+        html += `<div class="score-total">
+          <span class="score-total-label">Total</span>
+          <span class="score-total-value">${totalBase.toLocaleString()}${totalBonus > 0 ? `<span class="score-total-bonus">+${totalBonus.toLocaleString()}</span>` : ''}<span class="score-total-eq"> = ${totalPoints.toLocaleString()} pts</span></span>
+        </div>`;
+      }
+
+      // Contributed repos load async
       html += `<div id="contributed-section" class="popular-section contributed-placeholder">
-        <h3 class="popular-title">Repos You Contribute To</h3>
+        <h3 class="popular-title">Your Repos</h3>
         <div class="popular-grid"><div class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div></div>
       </div>`;
       html += `</div>`;
 
-      // Right column: Leaderboard + Completed Sets + Popular Repos
+      // Right column: Leaderboard + Discover
       html += `<div class="dashboard-col">`;
       html += `<div id="leaderboard-section" class="popular-section"></div>`;
-      if (completedRepos.length) {
-        html += `<div class="popular-section">
-          <h3 class="popular-title">Completed Sets</h3>
-          <div class="popular-grid">${completedRepos.map(r => repoBtn(r, false)).join('')}</div>
-        </div>`;
-      }
       if (otherRepos.length) {
         html += `<div class="popular-section">
-          <h3 class="popular-title">Popular Repos</h3>
+          <h3 class="popular-title">Discover</h3>
           <div class="popular-grid">${otherRepos.map(r => repoBtn(r, false)).join('')}</div>
         </div>`;
       }
@@ -353,7 +391,7 @@ async function loadContributedRepos(yourRepos) {
 
   section.className = 'popular-section';
   section.innerHTML = `
-    <h3 class="popular-title">Repos You Contribute To</h3>
+    <h3 class="popular-title">Your Repos</h3>
     <div class="popular-grid">${newContributed.map(contribBtn).join('')}</div>
   `;
 

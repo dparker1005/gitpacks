@@ -29,19 +29,34 @@ export async function GET() {
     return NextResponse.json([]);
   }
 
-  const { data: cacheData } = await anonSupabase
-    .from('repo_cache')
-    .select('owner_repo, data')
-    .in('owner_repo', repoNames);
+  // Fetch repo cache data and scores in parallel
+  const [cacheResult, scoresResult] = await Promise.all([
+    anonSupabase
+      .from('repo_cache')
+      .select('owner_repo, data')
+      .in('owner_repo', repoNames),
+    anonSupabase
+      .from('leaderboard_scores')
+      .select('owner_repo, base_points, completion_bonus, total_points')
+      .eq('user_id', user.id)
+      .in('owner_repo', repoNames),
+  ]);
+
+  const cacheData = cacheResult.data;
+  const scoresData = scoresResult.data;
 
   const result = repoNames.map(name => {
     const cached = cacheData?.find((r: any) => r.owner_repo === name);
     const totalCards = cached?.data ? (Array.isArray(cached.data) ? cached.data.length : 0) : 0;
+    const score = scoresData?.find((s: any) => s.owner_repo === name);
     return {
       name,
       collected: repoMap[name],
       cards: totalCards,
       pct: totalCards > 0 ? repoMap[name] / totalCards : 0,
+      base_points: score?.base_points || 0,
+      completion_bonus: score?.completion_bonus || 0,
+      total_points: score?.total_points || 0,
     };
   });
 

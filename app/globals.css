@@ -88,6 +88,18 @@
     .lb-pts-label { font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-left:3px; color:#4adede; opacity:0.7; }
     .lb-row.lb-you .lb-name { background:linear-gradient(135deg,#7873f5,#4adede); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
 
+    /* Repo button points */
+    .repo-points { font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:700; color:#4adede; white-space:nowrap; }
+    .repo-bonus { color:#7873f5; margin-left:2px; font-size:0.65rem; }
+    .popular-repo-meta { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+
+    /* Score total row */
+    .score-total { display:flex; justify-content:space-between; align-items:center; padding:14px 20px; margin-top:4px; border-radius:12px; border:1px solid rgba(74,222,222,0.2); background:linear-gradient(135deg,rgba(120,115,245,0.06),rgba(74,222,222,0.06)); }
+    .score-total-label { font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:700; color:#666; letter-spacing:3px; text-transform:uppercase; }
+    .score-total-value { font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; color:#4adede; }
+    .score-total-bonus { color:#7873f5; margin-left:2px; font-size:0.75rem; }
+    .score-total-eq { color:#4adede; margin-left:4px; }
+
     @media (max-width:768px) {
       .dashboard { grid-template-columns:1fr; gap:0; }
     }

@@ -1,7 +1,26 @@
 import { Resvg } from '@resvg/resvg-js';
 import { buildCardSvg, fetchAvatarBase64 } from '@/app/lib/card-svg';
+import fs from 'fs';
+import path from 'path';
 
 export const maxDuration = 10;
+
+// Read font files at module level so Next.js file tracing includes them in the serverless bundle
+const fontDir = path.join(process.cwd(), 'app/lib/fonts');
+const _fontTrace = [
+  fs.readFileSync(path.join(fontDir, 'Orbitron.ttf')),
+  fs.readFileSync(path.join(fontDir, 'Rajdhani-Bold.ttf')),
+  fs.readFileSync(path.join(fontDir, 'Rajdhani-Medium.ttf')),
+];
+const fontOpts = {
+  fontFiles: [
+    path.join(fontDir, 'Orbitron.ttf'),
+    path.join(fontDir, 'Rajdhani-Bold.ttf'),
+    path.join(fontDir, 'Rajdhani-Medium.ttf'),
+  ],
+  loadSystemFonts: false,
+  defaultFontFamily: 'Rajdhani',
+};
 
 async function getContributor(owner: string, repo: string, login: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -46,7 +65,7 @@ export async function GET(
     if (og) {
       // OG preview: 1200x630 landscape with card centered on branded background
       const cardSvg = buildCardSvg(contributor, cardNum, total, repoName, avatarDataUri, { animated: false });
-      const cardResvg = new Resvg(cardSvg, { fitTo: { mode: 'height', value: 570 }, font: { loadSystemFonts: true } });
+      const cardResvg = new Resvg(cardSvg, { fitTo: { mode: 'height', value: 570 }, font: fontOpts });
       const cardPng = cardResvg.render();
       const cardBase64 = Buffer.from(cardPng.asPng()).toString('base64');
       const cardW = Math.round(570 * 480 / 720); // maintain 2:3 aspect = 380
@@ -73,7 +92,7 @@ export async function GET(
         <text x="600" y="624" fill="url(#glow)" font-family="sans-serif" font-size="14" font-weight="700" text-anchor="middle" letter-spacing="3" opacity="0.6">GITPACKS.COM</text>
       </svg>`;
 
-      const ogResvg = new Resvg(ogSvg, { fitTo: { mode: 'width', value: 1200 }, font: { loadSystemFonts: true } });
+      const ogResvg = new Resvg(ogSvg, { fitTo: { mode: 'width', value: 1200 }, font: fontOpts });
       const ogPng = ogResvg.render();
       return new Response(new Uint8Array(ogPng.asPng()), {
         headers: {
@@ -86,7 +105,7 @@ export async function GET(
     const svg = buildCardSvg(contributor, cardNum, total, repoName, avatarDataUri, { animated: false });
     const resvg = new Resvg(svg, {
       fitTo: { mode: 'width', value: 960 },
-      font: { loadSystemFonts: true },
+      font: fontOpts,
     });
     const pngData = resvg.render();
     const pngBuffer = pngData.asPng();

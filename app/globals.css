@@ -995,8 +995,6 @@
     .profile-stat-value { font-family:'Orbitron',sans-serif; font-size:1.2rem; font-weight:700; color:#fff; letter-spacing:0.5px; }
     .profile-stat-label { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#666; margin-top:4px; text-transform:uppercase; letter-spacing:0.5px; }
 
-    .profile-compare-summary { background:rgba(120,115,245,0.08); border:1px solid rgba(120,115,245,0.2); border-radius:10px; padding:12px 16px; font-family:'Rajdhani',sans-serif; font-size:0.95rem; color:#b0b0ff; text-align:center; margin-bottom:28px; }
-
     .profile-section { margin-bottom:32px; }
     .profile-section-title { font-family:'Orbitron',sans-serif; font-size:0.9rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#666; margin:0 0 16px; }
     .profile-empty { font-family:'Rajdhani',sans-serif; color:#555; font-size:0.95rem; }
@@ -1016,17 +1014,10 @@
     .profile-progress-fill { position:absolute; top:0; left:0; height:100%; border-radius:3px; background:linear-gradient(90deg,#7873f5,#4adede); transition:width 0.3s; }
     .profile-progress-fill-viewer { position:absolute; top:0; left:0; height:100%; border-radius:3px; background:rgba(255,214,0,0.35); border:1px solid rgba(255,214,0,0.5); z-index:1; }
     .profile-repo-cards { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#666; white-space:nowrap; min-width:52px; text-align:right; }
-    .profile-repo-compare { margin-top:6px; }
-    .profile-compare-viewer { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#ffd700; }
+    .profile-repo-stacked-bars { display:flex; flex-direction:column; gap:4px; }
+    .profile-stacked-row { display:flex; align-items:center; gap:8px; }
+    .profile-stacked-label { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#888; min-width:60px; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .profile-completion-badge { display:inline-block; margin-top:6px; font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#4adede; background:rgba(74,222,222,0.1); border:1px solid rgba(74,222,222,0.25); border-radius:6px; padding:3px 8px; }
-
-    .profile-achievement-group { margin-bottom:16px; }
-    .profile-achievement-repo { font-family:'Rajdhani',sans-serif; font-size:0.9rem; font-weight:600; color:#888; margin:0 0 8px; }
-    .profile-achievements { display:flex; flex-wrap:wrap; gap:8px; }
-    .profile-achievement-badge { display:flex; align-items:center; gap:6px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:6px 10px; }
-    .profile-achievement-icon { font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:700; color:#7873f5; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:rgba(120,115,245,0.15); border-radius:50%; }
-    .profile-achievement-value { font-family:'Rajdhani',sans-serif; font-size:0.85rem; font-weight:600; color:#e0e0e0; }
-    .profile-achievement-date { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#555; }
 
     @media (max-width:768px) {
       .profile-stats { grid-template-columns:repeat(2,1fr); }

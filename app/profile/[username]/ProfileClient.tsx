@@ -14,13 +14,6 @@ interface Repo {
   is_insured: boolean;
 }
 
-interface Achievement {
-  owner_repo: string;
-  stat_type: string;
-  threshold: number;
-  unlocked_at: string;
-}
-
 interface ProfileData {
   username: string;
   avatar_url: string;
@@ -30,7 +23,6 @@ interface ProfileData {
   repos_collected: number;
   repos_completed: number;
   repos: Repo[];
-  achievements: Achievement[];
 }
 
 interface CompareRepo {
@@ -38,16 +30,6 @@ interface CompareRepo {
   viewer: { cards: number; points: number };
   profile: { cards: number; points: number };
 }
-
-const STAT_ICONS: Record<string, string> = {
-  commits: "C",
-  prs: "PR",
-  issues: "I",
-  active_weeks: "W",
-  streak: "S",
-  peak: "P",
-  consistency: "~",
-};
 
 export default function ProfileClient({ username }: { username: string }) {
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -119,15 +101,10 @@ export default function ProfileClient({ username }: { username: string }) {
 
   const isOwnProfile = viewer?.username.toLowerCase() === profile.username.toLowerCase();
   const compareMap = new Map(compareData.map((c) => [c.owner_repo, c]));
-  const viewerLeads = compareData.filter((c) => c.viewer.points > c.profile.points).length;
-  const profileLeads = compareData.filter((c) => c.profile.points > c.viewer.points).length;
-
-  // Group achievements by repo
-  const achievementsByRepo: Record<string, Achievement[]> = {};
-  for (const a of profile.achievements) {
-    if (!achievementsByRepo[a.owner_repo]) achievementsByRepo[a.owner_repo] = [];
-    achievementsByRepo[a.owner_repo].push(a);
-  }
+  const sharedRepos = profile.repos.filter((r) => compareMap.has(r.owner_repo));
+  const otherRepos = compareData.length > 0
+    ? profile.repos.filter((r) => !compareMap.has(r.owner_repo))
+    : profile.repos;
 
   return (
     <div className="profile-page">
@@ -166,28 +143,75 @@ export default function ProfileClient({ username }: { username: string }) {
         </div>
       </div>
 
-      {/* Comparison summary */}
-      {!isOwnProfile && compareData.length > 0 && (
-        <div className="profile-compare-summary">
-          You share {compareData.length} repo{compareData.length !== 1 ? "s" : ""}
-          {" — "}you lead in {viewerLeads}, they lead in {profileLeads}
-        </div>
-      )}
-
-      {/* Repos */}
-      <div className="profile-section">
-        <h2 className="profile-section-title">Repos</h2>
-        {profile.repos.length === 0 ? (
-          <p className="profile-empty">No repos collected yet.</p>
-        ) : (
+      {/* Shared Repos */}
+      {!isOwnProfile && sharedRepos.length > 0 && (
+        <div className="profile-section">
+          <h2 className="profile-section-title">Shared Repos</h2>
           <div className="profile-repos">
-            {profile.repos.map((repo) => {
-              const compare = compareMap.get(repo.owner_repo);
+            {sharedRepos.map((repo) => {
+              const compare = compareMap.get(repo.owner_repo)!;
               const pct = repo.total_cards_in_repo > 0
                 ? (repo.unique_cards / repo.total_cards_in_repo) * 100
                 : 0;
-              const viewerPct = compare && repo.total_cards_in_repo > 0
+              const viewerPct = repo.total_cards_in_repo > 0
                 ? (compare.viewer.cards / repo.total_cards_in_repo) * 100
+                : 0;
+
+              return (
+                <a
+                  key={repo.owner_repo}
+                  href={`/?repo=${repo.owner_repo}`}
+                  className="profile-repo-row"
+                >
+                  <div className="profile-repo-header">
+                    <span className="profile-repo-name">{repo.owner_repo}</span>
+                    <span className="profile-repo-points">
+                      {repo.total_points.toLocaleString()}
+                      <span className="profile-repo-pts-label">pts</span>
+                    </span>
+                  </div>
+                  <div className="profile-repo-stacked-bars">
+                    <div className="profile-stacked-row">
+                      <span className="profile-stacked-label">{profile.username}</span>
+                      <div className="profile-progress-bar">
+                        <div className="profile-progress-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="profile-repo-cards">{repo.unique_cards}/{repo.total_cards_in_repo}</span>
+                    </div>
+                    <div className="profile-stacked-row">
+                      <span className="profile-stacked-label">You</span>
+                      <div className="profile-progress-bar">
+                        <div className="profile-progress-fill-viewer" style={{ width: `${viewerPct}%` }} />
+                      </div>
+                      <span className="profile-repo-cards">{compare.viewer.cards}/{repo.total_cards_in_repo}</span>
+                    </div>
+                  </div>
+                  {repo.is_complete && (
+                    <span className="profile-completion-badge">
+                      Complete{repo.is_insured ? " (Insured)" : ""}
+                    </span>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Other Repos */}
+      <div className="profile-section">
+        <h2 className="profile-section-title">
+          {compareData.length > 0 ? `${profile.username}'s Other Repos` : "Repos"}
+        </h2>
+        {otherRepos.length === 0 && profile.repos.length === 0 ? (
+          <p className="profile-empty">No repos collected yet.</p>
+        ) : otherRepos.length === 0 ? (
+          <p className="profile-empty">All repos are shared with you.</p>
+        ) : (
+          <div className="profile-repos">
+            {otherRepos.map((repo) => {
+              const pct = repo.total_cards_in_repo > 0
+                ? (repo.unique_cards / repo.total_cards_in_repo) * 100
                 : 0;
 
               return (
@@ -205,28 +229,12 @@ export default function ProfileClient({ username }: { username: string }) {
                   </div>
                   <div className="profile-repo-progress">
                     <div className="profile-progress-bar">
-                      <div
-                        className="profile-progress-fill"
-                        style={{ width: `${pct}%` }}
-                      />
-                      {compare && (
-                        <div
-                          className="profile-progress-fill-viewer"
-                          style={{ width: `${viewerPct}%` }}
-                        />
-                      )}
+                      <div className="profile-progress-fill" style={{ width: `${pct}%` }} />
                     </div>
                     <span className="profile-repo-cards">
                       {repo.unique_cards}/{repo.total_cards_in_repo}
                     </span>
                   </div>
-                  {compare && (
-                    <div className="profile-repo-compare">
-                      <span className="profile-compare-viewer">
-                        You: {compare.viewer.cards}/{repo.total_cards_in_repo} ({compare.viewer.points} pts)
-                      </span>
-                    </div>
-                  )}
                   {repo.is_complete && (
                     <span className="profile-completion-badge">
                       Complete{repo.is_insured ? " (Insured)" : ""}
@@ -238,46 +246,6 @@ export default function ProfileClient({ username }: { username: string }) {
           </div>
         )}
       </div>
-
-      {/* Non-shared repos hint */}
-      {!isOwnProfile && compareData.length > 0 && (
-        <div className="profile-section">
-          {profile.repos.filter((r) => !compareMap.has(r.owner_repo)).length > 0 && (
-            <p className="profile-start-collecting">
-              {profile.username} has {profile.repos.filter((r) => !compareMap.has(r.owner_repo)).length} repo{profile.repos.filter((r) => !compareMap.has(r.owner_repo)).length !== 1 ? "s" : ""} you haven&apos;t started collecting.{" "}
-              <a href="/">Start collecting</a>
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Achievements */}
-      {profile.achievements.length > 0 && (
-        <div className="profile-section">
-          <h2 className="profile-section-title">Achievements</h2>
-          {Object.entries(achievementsByRepo).map(([repo, achievements]) => (
-            <div key={repo} className="profile-achievement-group">
-              <h3 className="profile-achievement-repo">{repo}</h3>
-              <div className="profile-achievements">
-                {achievements.map((a, i) => (
-                  <div key={i} className="profile-achievement-badge">
-                    <span className="profile-achievement-icon">
-                      {STAT_ICONS[a.stat_type] || a.stat_type.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="profile-achievement-value">{a.threshold}</span>
-                    <span className="profile-achievement-date">
-                      {new Date(a.unlocked_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

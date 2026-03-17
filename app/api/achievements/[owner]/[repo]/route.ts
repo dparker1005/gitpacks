@@ -67,13 +67,13 @@ export async function GET(
 
     const githubUsername = profile.github_username;
     if (!githubUsername) {
-      return NextResponse.json({ isContributor: false, selfCard: null, milestones: {} });
+      return NextResponse.json({ isContributor: false, selfCard: null, milestones: {}, maxPerStat: 0, cardCount: 0 });
     }
 
     const ownerRepo = `${owner}/${repo}`.toLowerCase();
     const cached = await getCachedRepo(ownerRepo);
     if (!cached || !Array.isArray(cached)) {
-      return NextResponse.json({ isContributor: false, selfCard: null, milestones: {} });
+      return NextResponse.json({ isContributor: false, selfCard: null, milestones: {}, maxPerStat: 0, cardCount: 0 });
     }
 
     const allContributors: Contributor[] = cached;
@@ -82,7 +82,9 @@ export async function GET(
     );
 
     if (!contributor) {
-      return NextResponse.json({ isContributor: false, selfCard: null, milestones: {} });
+      const cardCount = allContributors.length;
+      const maxPerStat = getMaxMilestonesPerStat(cardCount);
+      return NextResponse.json({ isContributor: false, selfCard: null, milestones: {}, maxPerStat, cardCount });
     }
 
     // Self-card grant (only side effect in GET)

@@ -46,7 +46,7 @@
     .popular-repo-btn.repo-complete .popular-repo-pct { background:linear-gradient(135deg,#7873f5,#4adede); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; font-weight:700; }
     .popular-repo-btn.repo-complete::after { content:'Complete'; position:absolute; right:12px; top:-8px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:4px; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; }
     .popular-repo-btn { position:relative; }
-    .popular-repo-name { font-weight:600; }
+    .popular-repo-name { font-weight:600; flex:1; min-width:0; }
     .popular-repo-meta { display:flex; align-items:center; gap:10px; }
     .popular-repo-progress { font-size:0.85rem; color:#4adede; font-family:'Orbitron',sans-serif; letter-spacing:1px; }
     .popular-repo-pct { font-size:0.75rem; color:#999; font-family:'Orbitron',sans-serif; letter-spacing:1px; }

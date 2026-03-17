@@ -750,6 +750,7 @@ function renderRepoInfo(owner, repo) {
     const slotsHint = maxPerStat < 5 ? 'More slots unlock as the repo grows' : '';
 
     achievementHTML = `<div class="achievement-panel">
+      <div class="panel-desc">Contribute to this repo to earn bonus packs</div>
       <div class="ach-slots-info">
         <span class="ach-slots-label">${Math.min(maxPerStat, 5)}/5 slots unlocked</span>
         ${slotsHint ? `<span class="ach-slots-hint">${slotsHint}</span>` : ''}
@@ -781,6 +782,7 @@ function renderRepoInfo(owner, repo) {
     const grandTotal = totalBase + completionBonus;
 
     breakdownHTML = `<div class="points-breakdown">
+      <div class="panel-desc">Collect cards to earn points and climb the leaderboard</div>
       <div class="pb-rows">
         ${rows.map(r => `<div class="pb-row">
           <span class="pb-rarity" style="color:${rarityColors[r.rarity]}">${r.rarity}</span>
@@ -852,8 +854,8 @@ function renderRepoInfo(owner, repo) {
         });
 
         starsHTML = `<details class="repo-panel-collapse" id="stars-panel"><summary class="repo-panel-toggle">Stars <span class="panel-summary">&starf; ${starBalance}${hasDupes ? ` &middot; ${dupeCount} dupe${dupeCount !== 1 ? 's' : ''} to revert` : ' &middot; revert dupes, cherry-pick cards'}</span></summary>
-          <div class="panel-desc">Revert duplicate cards for stars, spend stars to cherry-pick missing cards</div>
           <div class="stars-panel-body">
+            <div class="panel-desc">Revert duplicate cards for stars, spend stars to cherry-pick missing cards</div>
             <div class="stars-balance-display">&starf; ${starBalance} Stars</div>
             <div class="stars-rates">
               <div class="stars-rates-header"><span>Rarity</span><span>Revert</span><span>Dupes</span><span>Cherry-pick</span><span>Missing</span></div>
@@ -865,7 +867,7 @@ function renderRepoInfo(owner, repo) {
           </div>
         </details>`;
       }
-      const leftCol = _currentUser ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary><div class="panel-desc">Contribute to this repo to earn bonus packs</div>${achievementHTML}</details>` : '';
+      const leftCol = _currentUser ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '';
       const pointsTotal = (() => {
         let tb = 0;
         rarityOrder.forEach(r => { tb += allContributors.filter(c => c.rarity === r && library[c.login]).length * rarityPts[r]; });
@@ -873,7 +875,7 @@ function renderRepoInfo(owner, repo) {
         return tb + cb;
       })();
       const rightPanels = [
-        _currentUser ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Score <span class="panel-summary">${pointsTotal.toLocaleString()} pts${!isComplete ? ' &middot; 1.5x bonus at completion' : ' &middot; 1.5x bonus active'}</span></summary><div class="panel-desc">Collect cards to earn points and climb the leaderboard</div>${breakdownHTML}</details>` : '',
+        _currentUser ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Score <span class="panel-summary">${pointsTotal.toLocaleString()} pts${!isComplete ? ' &middot; 1.5x bonus at completion' : ' &middot; 1.5x bonus active'}</span></summary>${breakdownHTML}</details>` : '',
         starsHTML
       ].filter(Boolean).join('');
       const rightCol = rightPanels ? `<div class="repo-panels-right">${rightPanels}</div>` : '';

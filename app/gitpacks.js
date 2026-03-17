@@ -293,14 +293,13 @@ async function loadPopularRepos() {
         : '';
       const tradablePacks = r.stars >= 100 ? Math.floor(r.stars / 100) : 0;
       const starsHint = isComplete && tradablePacks > 0
-        ? `<span class="repo-stars-hint">&starf; ${r.stars} &rarr; ${tradablePacks} pack${tradablePacks !== 1 ? 's' : ''}</span>`
+        ? `<div class="repo-stars-hint">&starf; ${r.stars} &rarr; ${tradablePacks} pack${tradablePacks !== 1 ? 's' : ''}</div>`
         : '';
       return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
-          <span class="popular-repo-name">${r.name}${myRarityBadge(r)}${progressBar}</span>
+          <span class="popular-repo-name">${r.name}${myRarityBadge(r)}${progressBar}${starsHint}</span>
           <span class="popular-repo-meta-stacked">
             <span class="popular-repo-progress">${r.collected}/${r.cards} cards</span>
             ${pointsHTML}
-            ${starsHint}
           </span>
         </button>`;
     }

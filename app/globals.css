@@ -1117,4 +1117,4 @@
     .stars-trade-btn { display:block; width:100%; padding:10px 16px; margin-top:8px; border:1px solid rgba(120,115,245,0.35); border-radius:8px; background:rgba(120,115,245,0.08); color:#7873f5; font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
     .stars-trade-btn:hover { background:rgba(120,115,245,0.18); border-color:rgba(120,115,245,0.5); }
     .stars-trade-btn:disabled { opacity:0.5; cursor:default; }
-    .repo-stars-hint { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#4adede; opacity:0.8; }
+    .repo-stars-hint { display:block; font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#4adede; opacity:0.8; margin-top:4px; }

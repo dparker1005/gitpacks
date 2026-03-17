@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Not authenticated', detail: authError?.message }, { status: 401 });
     }
 
-    const profile = await getOrCreateProfile(supabase, user, 'ready_packs, bonus_packs, last_regen_at');
+    const profile = await getOrCreateProfile(supabase, user, 'ready_packs, bonus_packs, last_regen_at, created_at');
     if (!profile) {
       return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
     }
@@ -33,11 +33,15 @@ export async function GET() {
       ? regen.lastRegenAt + REGEN_INTERVAL_MS
       : null;
 
+    const isNewUser = (Date.now() - new Date(profile.last_regen_at).getTime()) < 60000
+      && profile.bonus_packs >= 10;
+
     return NextResponse.json({
       readyPacks: regen.readyPacks,
       bonusPacks: profile.bonus_packs,
       maxPacks: MAX_PACKS,
       nextRegenAt,
+      isNewUser,
     });
   } catch (e: any) {
     return NextResponse.json({ error: 'Unexpected error', detail: e?.message }, { status: 500 });

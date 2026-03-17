@@ -1103,3 +1103,9 @@
     .fs-referral-link strong { color:#e0e0e0; }
     .fs-ref-copy-btn { font-family:'Rajdhani',sans-serif; font-size:0.7rem; font-weight:600; color:#7873f5; background:none; border:1px solid rgba(120,115,245,0.3); border-radius:5px; padding:2px 8px; cursor:pointer; transition:all 0.2s; }
     .fs-ref-copy-btn:hover { background:rgba(120,115,245,0.1); border-color:#7873f5; }
+
+    /* ===== TRADE STARS FOR PACK ===== */
+    .stars-trade-btn { font-family:'Rajdhani',sans-serif; font-size:0.85rem; font-weight:700; color:#fff; background:linear-gradient(135deg,#7873f5,#4adede); border:none; border-radius:8px; padding:8px 16px; cursor:pointer; margin-top:8px; width:100%; transition:all 0.2s; }
+    .stars-trade-btn:hover { transform:scale(1.02); box-shadow:0 0 12px rgba(120,115,245,0.4); }
+    .stars-trade-btn:disabled { opacity:0.5; cursor:default; transform:none; box-shadow:none; }
+    .repo-stars-hint { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#4adede; opacity:0.8; }

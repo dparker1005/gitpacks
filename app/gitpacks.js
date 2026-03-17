@@ -281,11 +281,16 @@ async function loadPopularRepos() {
       const pointsHTML = r.total_points > 0
         ? `<span class="repo-points">${r.base_points.toLocaleString()} pts${bonusHTML}</span>`
         : '';
+      const tradablePacks = r.stars >= 100 ? Math.floor(r.stars / 100) : 0;
+      const starsHint = isComplete && tradablePacks > 0
+        ? `<span class="repo-stars-hint">&starf; ${r.stars} &rarr; ${tradablePacks} pack${tradablePacks !== 1 ? 's' : ''}</span>`
+        : '';
       return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
           <span class="popular-repo-name">${r.name}${myRarityBadge(r)}${progressBar}</span>
           <span class="popular-repo-meta-stacked">
             <span class="popular-repo-progress">${r.collected}/${r.cards} cards</span>
             ${pointsHTML}
+            ${starsHint}
           </span>
         </button>`;
     }
@@ -701,6 +706,30 @@ async function loadReferralInfo() {
   } catch { /* silent */ }
 }
 
+async function tradeStarsForPack() {
+  if (!_currentUser || !currentRepoName || starBalance < 100) return;
+  const btn = document.getElementById('trade-stars-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Trading...'; }
+  try {
+    const res = await fetch('/api/recycling/trade-for-pack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ owner_repo: currentRepoName }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      starBalance = data.newBalance;
+      if (packState) packState.bonusPacks = data.newBonusPacks;
+      renderTopBarPacks();
+      renderRepoInfoFromCurrent();
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Not enough stars'; }
+    }
+  } catch {
+    if (btn) { btn.disabled = false; }
+  }
+}
+
 async function claimShareReward() {
   if (!_currentUser || (_referralInfo && _referralInfo.sharedOnX)) return;
   try {
@@ -1096,6 +1125,7 @@ function renderRepoInfo(owner, repo) {
             </div>
             ${hasDupes ? `<button class="stars-revert-all-btn" id="revert-all-btn">Revert All Duplicates (${dupeCount} cards &rarr; +${totalRevertStars} &starf;)</button>` : '<div class="stars-no-dupes">No duplicate cards to revert</div>'}
             ${totalCherryStars > 0 && starBalance >= totalCherryStars ? `<button class="stars-cherry-all-btn" id="cherry-pick-all-btn">Cherry-pick All Missing (${perRarity.reduce((s,r) => s + r.missing, 0)} cards for ${totalCherryStars} &starf;)</button>` : ''}
+            ${starBalance >= 100 ? `<button class="stars-trade-btn" id="trade-stars-btn">Trade 100 &starf; for 1 Bonus Pack (${Math.floor(starBalance / 100)} available)</button>` : ''}
           </div>
         </details>`;
       }
@@ -1172,6 +1202,10 @@ function renderRepoInfo(owner, repo) {
   // Wire up cherry-pick all button
   const cherryAllBtn = document.getElementById('cherry-pick-all-btn');
   if (cherryAllBtn) cherryAllBtn.addEventListener('click', () => showCherryPickAllOverlay());
+
+  // Wire up trade stars for pack button
+  const tradeBtn = document.getElementById('trade-stars-btn');
+  if (tradeBtn) tradeBtn.addEventListener('click', () => tradeStarsForPack());
 
   // Wire up search input
   const searchInput = document.getElementById('card-search');

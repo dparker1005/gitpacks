@@ -33,8 +33,8 @@ export async function GET() {
   const meta = user.user_metadata || {};
   const githubUsername = meta.user_name || meta.preferred_username || '';
 
-  // Fetch repo cache card counts, scores, and contributor rarities in parallel
-  const [cacheResult, scoresResult, rarityResult] = await Promise.all([
+  // Fetch repo cache card counts, scores, stars, and contributor rarities in parallel
+  const [cacheResult, scoresResult, starsResult, rarityResult] = await Promise.all([
     anonSupabase
       .from('repo_cache')
       .select('owner_repo, card_count')
@@ -44,6 +44,11 @@ export async function GET() {
       .select('owner_repo, base_points, completion_bonus, total_points')
       .eq('user_id', user.id)
       .in('owner_repo', repoNames),
+    supabase
+      .from('user_stars')
+      .select('owner_repo, balance')
+      .eq('user_id', user.id)
+      .in('owner_repo', repoNames),
     githubUsername
       ? anonSupabase.rpc('get_user_contributor_rarities', { github_login: githubUsername })
       : Promise.resolve({ data: [] }),
@@ -51,6 +56,11 @@ export async function GET() {
 
   const cacheData = cacheResult.data;
   const scoresData = scoresResult.data;
+  const starsData = starsResult.data;
+  const starsMap: Record<string, number> = {};
+  (starsData || []).forEach((s: any) => {
+    starsMap[s.owner_repo] = s.balance || 0;
+  });
   const rarityMap: Record<string, string> = {};
   (rarityResult.data || []).forEach((r: any) => {
     rarityMap[r.owner_repo] = r.rarity;
@@ -69,6 +79,7 @@ export async function GET() {
       completion_bonus: score?.completion_bonus || 0,
       total_points: score?.total_points || 0,
       my_rarity: rarityMap[name] || null,
+      stars: starsMap[name] || 0,
     };
   });
 

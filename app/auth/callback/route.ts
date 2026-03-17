@@ -33,16 +33,37 @@ export async function GET(request: NextRequest) {
 
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // Ensure profile exists
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const meta = user.user_metadata;
+        const username = meta.user_name || meta.preferred_username || '';
+
+        // Check if profile already exists (returning user)
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single();
+
+        const isNewUser = !existingProfile;
+
+        // Create profile if needed
         await supabase.from('profiles').upsert({
           id: user.id,
-          github_username: meta.user_name || meta.preferred_username || '',
+          github_username: username,
           avatar_url: meta.avatar_url || '',
           bonus_packs: 10,
+          referral_code: username || undefined,
         }, { onConflict: 'id', ignoreDuplicates: true });
+
+        // Process referral for new users only
+        const ref = searchParams.get('ref');
+        if (isNewUser && ref) {
+          await supabase.rpc('process_referral', {
+            p_new_user_id: user.id,
+            p_referral_code: ref,
+          });
+        }
       }
       return NextResponse.redirect(`${origin}${next}`);
     }

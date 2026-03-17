@@ -23,6 +23,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   bonus_packs INTEGER NOT NULL DEFAULT 0,
   last_regen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   total_points INTEGER NOT NULL DEFAULT 0,
+  shared_on_x BOOLEAN NOT NULL DEFAULT FALSE,
+  referral_code TEXT,
+  referred_by UUID REFERENCES profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -85,6 +88,14 @@ CREATE TABLE IF NOT EXISTS daily_claims (
   PRIMARY KEY (user_id, event_type, claim_date)
 );
 
+-- Referrals (tracks who referred whom)
+CREATE TABLE IF NOT EXISTS referrals (
+  referrer_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  referred_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (referred_id)
+);
+
 -- Daily detections cache (server-side GitHub event detection cache)
 CREATE TABLE IF NOT EXISTS daily_detections (
   user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
@@ -123,6 +134,7 @@ ALTER TABLE user_packs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_self_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE collection_completions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE referrals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_claims ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_detections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leaderboard_scores ENABLE ROW LEVEL SECURITY;
@@ -133,6 +145,7 @@ CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.
 CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 CREATE INDEX IF NOT EXISTS idx_profiles_username_lower ON profiles (lower(github_username));
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_referral_code ON profiles(referral_code) WHERE referral_code IS NOT NULL;
 
 -- Collections: users can manage their own collections
 CREATE POLICY "Users can view own collections" ON user_collections FOR SELECT USING (auth.uid() = user_id);
@@ -166,6 +179,11 @@ CREATE INDEX IF NOT EXISTS idx_daily_claims_user_date ON daily_claims(user_id, c
 CREATE POLICY "Users read own detections" ON daily_detections FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users upsert own detections" ON daily_detections FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "Users update own detections" ON daily_detections FOR UPDATE USING (auth.uid() = user_id);
+
+-- Referrals: users can view their own (as referrer or referred)
+CREATE POLICY "Users view own referrals as referrer" ON referrals FOR SELECT USING (auth.uid() = referrer_id);
+CREATE POLICY "Users view own referrals as referred" ON referrals FOR SELECT USING (auth.uid() = referred_id);
+CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
 
 -- Leaderboard scores: publicly readable (writes via RPC only)
 CREATE POLICY "Leaderboard is publicly readable" ON leaderboard_scores FOR SELECT USING (true);
@@ -576,6 +594,83 @@ BEGIN
   RETURNING bonus_packs INTO cur_bonus;
 
   RETURN QUERY SELECT true, cur_bonus, (cur_claims + 1);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Claim share reward: one-time 5 bonus packs for sharing on X
+CREATE OR REPLACE FUNCTION claim_share_reward(
+  p_user_id UUID
+) RETURNS TABLE(success BOOLEAN, new_bonus_packs INT) AS $$
+DECLARE
+  cur_shared BOOLEAN;
+  cur_bonus INT;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  SELECT shared_on_x INTO cur_shared FROM profiles WHERE id = p_user_id FOR UPDATE;
+
+  IF cur_shared IS NULL OR cur_shared THEN
+    RETURN QUERY SELECT false, 0;
+    RETURN;
+  END IF;
+
+  UPDATE profiles
+  SET shared_on_x = true, bonus_packs = bonus_packs + 5
+  WHERE id = p_user_id
+  RETURNING bonus_packs INTO cur_bonus;
+
+  RETURN QUERY SELECT true, cur_bonus;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Process referral on new user signup
+CREATE OR REPLACE FUNCTION process_referral(
+  p_new_user_id UUID,
+  p_referral_code TEXT
+) RETURNS TABLE(success BOOLEAN, referrer_username TEXT) AS $$
+DECLARE
+  v_referrer_id UUID;
+  v_referrer_username TEXT;
+  v_referred_by UUID;
+  v_referral_count INT;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_new_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  SELECT referred_by INTO v_referred_by FROM profiles WHERE id = p_new_user_id;
+  IF v_referred_by IS NOT NULL THEN
+    RETURN QUERY SELECT false, ''::TEXT;
+    RETURN;
+  END IF;
+
+  SELECT id, github_username INTO v_referrer_id, v_referrer_username
+  FROM profiles WHERE referral_code = p_referral_code;
+
+  IF v_referrer_id IS NULL OR v_referrer_id = p_new_user_id THEN
+    RETURN QUERY SELECT false, ''::TEXT;
+    RETURN;
+  END IF;
+
+  SELECT COUNT(*) INTO v_referral_count FROM referrals WHERE referrer_id = v_referrer_id;
+  IF v_referral_count >= 10 THEN
+    RETURN QUERY SELECT false, v_referrer_username;
+    RETURN;
+  END IF;
+
+  BEGIN
+    INSERT INTO referrals (referrer_id, referred_id) VALUES (v_referrer_id, p_new_user_id);
+  EXCEPTION WHEN unique_violation THEN
+    RETURN QUERY SELECT false, ''::TEXT;
+    RETURN;
+  END;
+
+  UPDATE profiles SET bonus_packs = bonus_packs + 5 WHERE id = v_referrer_id;
+  UPDATE profiles SET bonus_packs = bonus_packs + 5, referred_by = v_referrer_id WHERE id = p_new_user_id;
+
+  RETURN QUERY SELECT true, v_referrer_username;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

@@ -8,6 +8,9 @@ export interface Profile {
   bonus_packs: number;
   last_regen_at: string;
   total_points: number;
+  shared_on_x: boolean;
+  referral_code: string;
+  referred_by: string | null;
 }
 
 /**
@@ -27,12 +30,14 @@ export async function getOrCreateProfile(
   if (profile) return profile as unknown as Profile;
 
   const meta = user.user_metadata || {};
+  const username = meta.user_name || meta.preferred_username || '';
   await supabase.from('profiles').upsert(
     {
       id: user.id,
-      github_username: meta.user_name || meta.preferred_username || '',
+      github_username: username,
       avatar_url: meta.avatar_url || '',
       bonus_packs: 10,
+      referral_code: username || undefined,
     },
     { onConflict: 'id', ignoreDuplicates: true }
   );

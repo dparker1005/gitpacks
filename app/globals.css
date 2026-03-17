@@ -1091,3 +1091,12 @@
       #dailies-section { padding:0 12px; }
       .dailies-section { padding:10px 12px; }
     }
+
+    /* ===== REFERRAL INFO (FULLSCREEN CARD OVERLAY) ===== */
+    .fs-referral-info { text-align:center; margin-top:10px; padding:8px 12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; }
+    .fs-referral-hint { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#e0e0e0; margin-bottom:4px; }
+    .fs-referral-hint strong { color:#4ade80; }
+    .fs-referral-claimed { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#4ade80; margin-bottom:4px; }
+    .fs-referral-link { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#999; display:flex; align-items:center; justify-content:center; gap:6px; }
+    .fs-ref-copy-btn { font-family:'Rajdhani',sans-serif; font-size:0.7rem; font-weight:600; color:#7873f5; background:none; border:1px solid rgba(120,115,245,0.3); border-radius:5px; padding:2px 8px; cursor:pointer; transition:all 0.2s; }
+    .fs-ref-copy-btn:hover { background:rgba(120,115,245,0.1); border-color:#7873f5; }

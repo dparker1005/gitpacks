@@ -13,6 +13,12 @@ export default function Home() {
   const [user, setUser] = useState<UserInfo | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
+  // Store referral code from URL on first visit
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) localStorage.setItem('gp_ref', ref);
+  }, []);
+
   useEffect(() => {
     const supabase = getSupabaseBrowser();
 
@@ -57,9 +63,13 @@ export default function Home() {
 
   function handleLogin() {
     const supabase = getSupabaseBrowser();
+    const ref = localStorage.getItem('gp_ref');
+    const callbackUrl = ref
+      ? `${window.location.origin}/auth/callback?ref=${encodeURIComponent(ref)}`
+      : `${window.location.origin}/auth/callback`;
     supabase.auth.signInWithOAuth({
       provider: 'github',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: callbackUrl },
     });
   }
 

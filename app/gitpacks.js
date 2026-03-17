@@ -43,6 +43,7 @@ let packCountdownInterval = null;
 let guestPacksRemaining = 5; // for logged-out users
 let lastAchievementData = null; // achievement data for current repo
 let starBalance = 0; // per-repo star balance for card recycling
+let _referralInfo = null; // { referralCode, referralCount, maxReferrals, sharedOnX }
 
 // Global space handler — only one at a time, avoids stacking conflicts
 let _spaceAction = null;
@@ -53,6 +54,18 @@ function clearSpaceAction() { _spaceAction = null; }
 
 const searchContainer = document.getElementById('search-container');
 const popularRepos = document.getElementById('popular-repos');
+
+// Store referral code from URL (belt and suspenders with page.tsx)
+const _urlRef = new URLSearchParams(window.location.search).get('ref');
+if (_urlRef) localStorage.setItem('gp_ref', _urlRef);
+
+function getReferralUrl(baseUrl) {
+  if (_currentUser) {
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return baseUrl + sep + 'ref=' + encodeURIComponent(_currentUser.username);
+  }
+  return baseUrl;
+}
 
 function getPackOddsHTML() {
   return `<div class="pack-odds-box">
@@ -679,8 +692,33 @@ async function refreshDailies() {
   if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
 }
 
+// ===== REFERRAL INFO =====
+async function loadReferralInfo() {
+  if (!_currentUser) return;
+  try {
+    const res = await fetch('/api/referrals');
+    if (res.ok) _referralInfo = await res.json();
+  } catch { /* silent */ }
+}
+
+async function claimShareReward() {
+  if (!_currentUser || (_referralInfo && _referralInfo.sharedOnX)) return;
+  try {
+    const res = await fetch('/api/share-reward', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        if (packState) packState.bonusPacks = data.newBonusPacks;
+        if (_referralInfo) _referralInfo.sharedOnX = true;
+        renderTopBarPacks();
+      }
+    }
+  } catch { /* silent */ }
+}
+
 // Load pack state for top bar (all users)
 loadPackState();
+loadReferralInfo();
 
 // Auto-load from URL param, otherwise show repo browser
 const urlRepo = new URLSearchParams(window.location.search).get('repo');
@@ -2032,7 +2070,7 @@ function setSortBy(sort) {
 }
 
 function shareRepo() {
-  const url = window.location.origin + window.location.pathname + '?repo=' + currentRepoName;
+  const url = getReferralUrl(window.location.origin + window.location.pathname + '?repo=' + currentRepoName);
   const btn = document.getElementById('share-btn');
   navigator.clipboard.writeText(url).then(() => {
     if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Share', 2000); }
@@ -2250,9 +2288,13 @@ function openFullscreenCard(c) {
       </div>
       <div class="fullscreen-share-row">
         <button class="share-action-btn" id="fs-copy-link">Copy Link</button>
-        <a class="share-action-btn" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(_currentUser && _currentUser.login === c.login ? `Check out my @GitPacks card for ${currentRepoName}!` : `Check out ${c.login}'s @GitPacks card for ${currentRepoName}!`)}&url=${encodeURIComponent(`${window.location.origin}/card/${currentRepoName}/${c.login}`)}" target="_blank" rel="noopener">Share on X</a>
+        <a class="share-action-btn" id="fs-share-x" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(_currentUser && _currentUser.username === c.login ? `Check out my @GitPacks card for ${currentRepoName}!` : `Check out ${c.login}'s @GitPacks card for ${currentRepoName}!`)}&url=${encodeURIComponent(getReferralUrl(`${window.location.origin}/card/${currentRepoName}/${c.login}`))}" target="_blank" rel="noopener">Share on X</a>
         <button class="share-action-btn" id="fs-copy-md">Copy for README</button>
       </div>
+      ${_currentUser && _referralInfo ? `<div class="fs-referral-info">
+        ${!_referralInfo.sharedOnX ? `<div class="fs-referral-hint">Share on X to earn <strong>5 bonus packs</strong>!</div>` : `<div class="fs-referral-claimed">Shared — 5 packs earned</div>`}
+        <div class="fs-referral-link">Your link earns you both bonus packs <button class="fs-ref-copy-btn" id="fs-ref-copy">${_referralInfo.referralCount}/${_referralInfo.maxReferrals} referrals</button></div>
+      </div>` : ''}
     </div>`;
   document.body.appendChild(overlay);
 
@@ -2286,8 +2328,8 @@ function openFullscreenCard(c) {
   overlay.querySelector('.fullscreen-layout').addEventListener('click', e => e.stopPropagation());
   overlay.querySelector('.fullscreen-bottom').addEventListener('click', e => e.stopPropagation());
 
-  // Share buttons
-  const shareUrl = `${window.location.origin}/card/${currentRepoName}/${c.login}`;
+  // Share buttons (all URLs include referral link)
+  const shareUrl = getReferralUrl(`${window.location.origin}/card/${currentRepoName}/${c.login}`);
   const mdSnippet = `<a href="${shareUrl}"><img src="${window.location.origin}/api/card/${currentRepoName}/${c.login}" alt="${c.login} on ${currentRepoName}" width="200" /></a>`;
 
   const copyLinkBtn = overlay.querySelector('#fs-copy-link');
@@ -2298,11 +2340,27 @@ function openFullscreenCard(c) {
     });
   });
 
+  // Share on X — also triggers one-time share reward
+  const shareXBtn = overlay.querySelector('#fs-share-x');
+  if (shareXBtn) shareXBtn.addEventListener('click', () => {
+    claimShareReward();
+  });
+
   const copyMdBtn = overlay.querySelector('#fs-copy-md');
   if (copyMdBtn) copyMdBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(mdSnippet).then(() => {
       copyMdBtn.textContent = 'Copied!';
       setTimeout(() => { copyMdBtn.textContent = 'Copy for README'; }, 2000);
+    });
+  });
+
+  // Referral link copy button
+  const refCopyBtn = overlay.querySelector('#fs-ref-copy');
+  if (refCopyBtn) refCopyBtn.addEventListener('click', () => {
+    const refUrl = getReferralUrl(window.location.origin);
+    navigator.clipboard.writeText(refUrl).then(() => {
+      refCopyBtn.textContent = 'Copied!';
+      setTimeout(() => { refCopyBtn.textContent = `${_referralInfo?.referralCount || 0}/${_referralInfo?.maxReferrals || 10} referrals`; }, 2000);
     });
   });
 

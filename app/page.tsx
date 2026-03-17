@@ -169,9 +169,7 @@ export default function Home() {
               <div className="landing-way"><strong>10 starter packs</strong> on signup</div>
               <div className="landing-way"><strong>3 daily task packs</strong> from GitHub activity</div>
               <div className="landing-way"><strong>Achievement packs</strong> for repos you contribute to</div>
-              <div className="landing-way"><strong>Referral packs</strong> — you both get 5 packs</div>
               <div className="landing-way"><strong>Pack regen</strong> — 1 new pack every 12 hours</div>
-              <div className="landing-way"><strong>Share on X</strong> for 5 bonus packs</div>
             </div>
           </div>
 

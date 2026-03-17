@@ -1048,18 +1048,18 @@
 
     /* ===== DAILIES SECTION ===== */
     #dailies-section { max-width:600px; margin:0 auto; padding:0 20px; }
-    .dailies-section { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px 18px 12px; margin-bottom:20px; text-align:center; }
+    .dailies-section { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:14px 18px 12px; margin-bottom:20px; text-align:center; }
     .dailies-header { display:flex; flex-direction:column; align-items:center; gap:4px; margin-bottom:8px; }
     .dailies-title-row { display:flex; align-items:center; gap:10px; }
     .dailies-title { font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; color:#e0e0e0; display:flex; align-items:center; gap:6px; }
     .dailies-title svg { width:16px; height:16px; }
-    .dailies-meta-row { display:flex; align-items:center; gap:8px; font-size:0.72rem; color:#888; }
+    .dailies-meta-row { display:flex; align-items:center; gap:8px; font-size:0.72rem; color:#aaa; }
     .daily-progress { display:flex; align-items:center; gap:4px; margin-left:auto; }
     .daily-progress-dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); }
     .daily-progress-dot.filled { background:#4ade80; border-color:#4ade80; box-shadow:0 0 6px rgba(74,222,222,0.4); }
-    .daily-progress-text { font-family:'Orbitron',sans-serif; font-size:0.65rem; color:#888; margin-left:3px; }
-    .daily-reset-timer { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#888; }
-    .daily-checked-ago { font-size:0.7rem; color:#555; }
+    .daily-progress-text { font-family:'Orbitron',sans-serif; font-size:0.65rem; color:#bbb; margin-left:3px; }
+    .daily-reset-timer { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#bbb; }
+    .daily-checked-ago { font-size:0.7rem; color:#888; }
     .daily-refresh-btn { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#7873f5; background:none; border:1px solid rgba(120,115,245,0.3); border-radius:5px; padding:1px 8px; cursor:pointer; transition:all 0.2s; }
     .daily-refresh-btn:hover { background:rgba(120,115,245,0.1); border-color:#7873f5; }
     .daily-refresh-btn:disabled { opacity:0.5; cursor:default; }
@@ -1067,15 +1067,15 @@
     .daily-item { display:flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.06); background:rgba(255,255,255,0.02); text-align:left; transition:all 0.2s; }
     .daily-item.claimed { border-color:rgba(74,222,128,0.3); background:rgba(74,222,128,0.06); }
     .daily-item.claimable { border-color:rgba(120,115,245,0.4); background:rgba(120,115,245,0.06); box-shadow:0 0 10px rgba(120,115,245,0.12); }
-    .daily-item.unchecked { opacity:0.4; }
+    .daily-item.unchecked { opacity:0.55; }
     .daily-item-icon { display:flex; align-items:center; flex-shrink:0; }
     .daily-item-icon svg { width:16px; height:16px; }
     .daily-item.claimed .daily-item-icon svg { fill:#4ade80; }
     .daily-item.claimable .daily-item-icon svg { fill:#7873f5; }
-    .daily-item.unchecked .daily-item-icon svg { fill:#555; }
-    .daily-item-label { font-family:'Rajdhani',sans-serif; font-size:0.78rem; font-weight:600; color:#ccc; line-height:1.2; white-space:nowrap; }
+    .daily-item.unchecked .daily-item-icon svg { fill:#777; }
+    .daily-item-label { font-family:'Rajdhani',sans-serif; font-size:0.78rem; font-weight:600; color:#e0e0e0; line-height:1.2; white-space:nowrap; }
     .daily-item.claimed .daily-item-label { color:#4ade80; }
-    .daily-item.unchecked .daily-item-label { color:#666; }
+    .daily-item.unchecked .daily-item-label { color:#888; }
     .daily-item-action { display:flex; align-items:center; margin-left:2px; }
     .daily-status-claimed { font-family:'Orbitron',sans-serif; font-size:0.55rem; color:#4ade80; letter-spacing:0.5px; }
     .daily-status-unchecked { display:none; }
@@ -1084,8 +1084,8 @@
     .daily-claim-btn:disabled { opacity:0.6; cursor:default; transform:none; box-shadow:none; }
     .daily-claim-btn svg { width:12px; height:12px; }
     .dailies-done { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#4ade80; text-align:center; padding:2px 0 6px; }
-    .dailies-desc { font-family:'Rajdhani',sans-serif; font-size:0.82rem; color:#999; margin-bottom:8px; }
-    .dailies-hint { font-size:0.62rem; color:#444; text-align:center; margin-top:8px; }
+    .dailies-desc { font-family:'Rajdhani',sans-serif; font-size:0.82rem; color:#bbb; margin-bottom:8px; }
+    .dailies-hint { font-size:0.65rem; color:#777; text-align:center; margin-top:8px; }
 
     @media (max-width:600px) {
       #dailies-section { padding:0 12px; }

@@ -4,7 +4,11 @@ import { useEffect } from 'react';
 
 export default function CardRedirect({ href }: { href: string }) {
   useEffect(() => {
-    window.location.replace(href);
+    // Preserve referral code through the redirect
+    const ref = new URLSearchParams(window.location.search).get('ref');
+    if (ref) localStorage.setItem('gp_ref', ref);
+    const finalHref = ref ? `${href}${href.includes('?') ? '&' : '?'}ref=${encodeURIComponent(ref)}` : href;
+    window.location.replace(finalHref);
   }, [href]);
 
   return (

@@ -47,6 +47,12 @@
     .popular-repo-btn.repo-complete::after { content:'Complete'; position:absolute; right:12px; top:-8px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:4px; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; }
     .popular-repo-btn { position:relative; }
     .popular-repo-name { font-weight:600; flex:1; min-width:0; }
+    .my-rarity-badge { display:inline-block; font-family:'Orbitron',sans-serif; font-size:0.45rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 6px; border-radius:4px; margin-left:8px; vertical-align:middle; position:relative; top:-1px; }
+    .my-rarity-badge.common { background:rgba(136,136,136,0.2); color:#888; border:1px solid rgba(136,136,136,0.4); }
+    .my-rarity-badge.rare { background:rgba(59,130,246,0.2); color:#60a5fa; border:1px solid rgba(59,130,246,0.4); }
+    .my-rarity-badge.epic { background:rgba(168,85,247,0.25); color:#c084fc; border:1px solid rgba(168,85,247,0.4); }
+    .my-rarity-badge.legendary { background:linear-gradient(135deg,rgba(255,215,0,0.3),rgba(255,110,199,0.3)); color:#ffd700; border:1px solid rgba(255,215,0,0.4); }
+    .my-rarity-badge.mythic { background:linear-gradient(135deg,rgba(255,0,64,0.4),rgba(255,100,0,0.4)); color:#ff0040; border:1px solid rgba(255,0,64,0.6); }
     .popular-repo-meta { display:flex; align-items:center; gap:10px; }
     .popular-repo-progress { font-size:0.85rem; color:#4adede; font-family:'Orbitron',sans-serif; letter-spacing:1px; }
     .popular-repo-pct { font-size:0.75rem; color:#999; font-family:'Orbitron',sans-serif; letter-spacing:1px; }

@@ -221,6 +221,7 @@ async function loadPopularRepos() {
         r.base_points = ur ? ur.base_points : 0;
         r.completion_bonus = ur ? ur.completion_bonus : 0;
         r.total_points = ur ? ur.total_points : 0;
+        r.my_rarity = ur ? ur.my_rarity : null;
       });
     }
 
@@ -232,6 +233,11 @@ async function loadPopularRepos() {
     const inProgressRepos = yourRepos.filter(r => r.collected > 0 && (r.cards === 0 || r.collected < r.cards))
       .sort((a, b) => b.pct - a.pct);
 
+    function myRarityBadge(r) {
+      if (!r.my_rarity) return '';
+      return `<span class="my-rarity-badge ${r.my_rarity}">${r.my_rarity}</span>`;
+    }
+
     function repoBtn(r, showProgressBar) {
       const pctNum = Math.round(r.pct * 100);
       const isComplete = r.cards > 0 && r.collected >= r.cards;
@@ -239,7 +245,7 @@ async function loadPopularRepos() {
         ? `<div class="repo-progress-bar"><div class="repo-progress-fill" style="width:${pctNum}%"></div></div>`
         : '';
       return `<button class="popular-repo-btn${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
-          <span class="popular-repo-name">${r.name}${progressBar}</span>
+          <span class="popular-repo-name">${r.name}${myRarityBadge(r)}${progressBar}</span>
           <span class="popular-repo-meta">
             <span class="popular-repo-progress">${r.collected}/${r.cards}</span>
             <span class="popular-repo-pct">${pctNum}%</span>
@@ -260,7 +266,7 @@ async function loadPopularRepos() {
         ? `<span class="repo-points">${r.base_points.toLocaleString()} pts${bonusHTML}</span>`
         : '';
       return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
-          <span class="popular-repo-name">${r.name}${progressBar}</span>
+          <span class="popular-repo-name">${r.name}${myRarityBadge(r)}${progressBar}</span>
           <span class="popular-repo-meta-stacked">
             <span class="popular-repo-progress">${r.collected}/${r.cards} cards</span>
             ${pointsHTML}

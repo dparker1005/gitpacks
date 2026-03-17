@@ -97,6 +97,7 @@ export default function Home() {
         <div className="top-bar-left">
         </div>
         <div className="top-bar-right">
+          <a className="btn-feedback" href="mailto:gitpacksapp@gmail.com?subject=GitPacks%20Feedback">Feedback</a>
           <button className="btn-share" id="share-btn">Share</button>
           <div id="top-bar-packs"></div>
           {authLoading ? null : user ? (

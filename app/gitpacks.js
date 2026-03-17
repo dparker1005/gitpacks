@@ -38,7 +38,7 @@ let sortBy = 'power'; // 'power', 'quantity', 'commits', 'prs', 'issues', 'strea
 let cardSearch = '';
 
 // Pack state for all users
-let packState = null; // { readyPacks, maxPacks, nextRegenAt }
+let packState = null; // { readyPacks, bonusPacks, maxPacks, nextRegenAt }
 let packCountdownInterval = null;
 let guestPacksRemaining = 5; // for logged-out users
 let lastAchievementData = null; // achievement data for current repo
@@ -138,13 +138,16 @@ function renderTopBarPacks() {
   }
 
   if (!packState) { el.innerHTML = ''; return; }
-  const { readyPacks, maxPacks, nextRegenAt } = packState;
+  const { readyPacks, bonusPacks = 0, maxPacks, nextRegenAt } = packState;
   const timerHTML = readyPacks < maxPacks && nextRegenAt
     ? `<span class="topbar-pack-timer" id="topbar-pack-timer"></span>`
     : '';
+  const bonusHTML = bonusPacks > 0
+    ? `<span class="topbar-packs-bonus">${bonusPacks}</span><span class="topbar-packs-plus">+</span>`
+    : '';
   el.innerHTML = `<div class="topbar-packs">
     <span class="topbar-packs-icon">${GP_ICON}</span>
-    <span class="topbar-packs-count">${readyPacks}</span>
+    ${bonusHTML}<span class="topbar-packs-count">${readyPacks}<span class="topbar-packs-max">/${maxPacks}</span></span>
     ${timerHTML}
   </div>`;
   if (readyPacks < maxPacks && nextRegenAt) startPackCountdown();
@@ -277,6 +280,9 @@ async function loadPopularRepos() {
     let html = '';
 
     if (_currentUser) {
+      // Dailies section (above dashboard, only for logged-in users)
+      html += `<div id="dailies-section"></div>`;
+
       // Dashboard layout for logged-in users
       html += `<div class="dashboard">`;
 
@@ -361,10 +367,11 @@ async function loadPopularRepos() {
       b.addEventListener('click', () => quickLoad(b.dataset.repo));
     });
 
-    // Lazy load contributed repos and leaderboard
+    // Lazy load contributed repos, leaderboard, and dailies
     loadLeaderboard();
     if (_currentUser) {
       loadContributedRepos(yourRepos);
+      loadDailies();
     }
   } catch { /* silent */ }
 }
@@ -504,6 +511,167 @@ async function loadLeaderboard() {
 
     section.innerHTML = html;
   } catch { /* silent */ }
+}
+
+// ===== DAILIES =====
+const DAILY_EVENTS = [
+  { type: 'PushEvent', label: 'Push a commit', icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 0a8 8 0 110 16A8 8 0 018 0zm.75 4.75a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z"/></svg>' },
+  { type: 'IssuesEvent', label: 'Open an issue', icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 9.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/><path d="M8 0a8 8 0 100 16A8 8 0 008 0zM1.5 8a6.5 6.5 0 1113 0 6.5 6.5 0 01-13 0z"/></svg>' },
+  { type: 'PullRequestEvent', label: 'Open a pull request', icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M7.177 3.073L9.573.677A.25.25 0 0110 .854v4.792a.25.25 0 01-.427.177L7.177 3.427a.25.25 0 010-.354zM3.75 2.5a.75.75 0 100 1.5.75.75 0 000-1.5zm-2.25.75a2.25 2.25 0 113 2.122v5.256a2.251 2.251 0 11-1.5 0V5.372A2.25 2.25 0 011.5 3.25zM11 2.5h-1V4h1a1 1 0 011 1v5.628a2.251 2.251 0 101.5 0V5A2.5 2.5 0 0011 2.5zm1 10.25a.75.75 0 111.5 0 .75.75 0 01-1.5 0zM3.75 12a.75.75 0 100 1.5.75.75 0 000-1.5z"/></svg>' },
+  { type: 'IssueCommentEvent', label: 'Comment on an issue', icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v7.5A1.75 1.75 0 0113.25 12H9.06l-2.573 2.573A1.458 1.458 0 014 13.543V12H2.75A1.75 1.75 0 011 10.25v-7.5zm1.5 0a.25.25 0 01.25-.25h10.5a.25.25 0 01.25.25v7.5a.25.25 0 01-.25.25h-4.5a.75.75 0 00-.53.22l-2.72 2.72v-2.19a.75.75 0 00-.75-.75h-2a.25.25 0 01-.25-.25v-7.5z"/></svg>' },
+  { type: 'PullRequestReviewEvent', label: 'Review a pull request', icon: '<svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M1.5 3.25c0-.966.784-1.75 1.75-1.75h8.5c.966 0 1.75.784 1.75 1.75v7.5a1.75 1.75 0 01-1.75 1.75H9.06l-2.573 2.573A1.458 1.458 0 014 13.543V12.5H3.25a1.75 1.75 0 01-1.75-1.75v-7.5zm7.03 2.22a.75.75 0 10-1.06 1.06L8.69 7.75 7.47 8.97a.75.75 0 101.06 1.06l1.75-1.75a.75.75 0 000-1.06l-1.75-1.75z"/></svg>' },
+];
+
+let dailyCountdownInterval = null;
+
+async function loadDailies() {
+  const section = document.getElementById('dailies-section');
+  if (!section || !_currentUser) return;
+
+  try {
+    const res = await fetch('/api/dailies');
+    if (!res.ok) { section.innerHTML = ''; return; }
+    const data = await res.json();
+    renderDailies(section, data);
+  } catch { section.innerHTML = ''; }
+}
+
+function renderDailies(section, data) {
+  const { detected = [], claims = [], claimsCount = 0, maxClaims = 3, resetAt, lastCheckedAt } = data;
+  const claimedSet = new Set(claims);
+  const detectedSet = new Set(detected);
+  const allDone = claimsCount >= maxClaims;
+
+  let itemsHTML = DAILY_EVENTS.map(ev => {
+    const isClaimed = claimedSet.has(ev.type);
+    const isDetected = detectedSet.has(ev.type);
+    const canClaim = isDetected && !isClaimed && !allDone;
+    const statusClass = isClaimed ? 'claimed' : canClaim ? 'claimable' : 'unchecked';
+
+    let statusHTML;
+    if (isClaimed) {
+      statusHTML = `<span class="daily-status-claimed">Claimed</span>`;
+    } else if (canClaim) {
+      statusHTML = `<button class="daily-claim-btn" data-daily-claim="${ev.type}">Claim +1 ${GP_ICON}</button>`;
+    } else {
+      statusHTML = `<span class="daily-status-unchecked">Not detected</span>`;
+    }
+
+    return `<div class="daily-item ${statusClass}">
+      <div class="daily-item-icon">${ev.icon}</div>
+      <div class="daily-item-label">${ev.label}</div>
+      <div class="daily-item-action">${statusHTML}</div>
+    </div>`;
+  }).join('');
+
+  const progressDots = Array.from({ length: maxClaims }, (_, i) =>
+    `<span class="daily-progress-dot${i < claimsCount ? ' filled' : ''}"></span>`
+  ).join('');
+
+  const checkedAgo = lastCheckedAt ? formatTimeAgo(new Date(lastCheckedAt)) : '';
+  const checkedHint = checkedAgo ? `<span class="daily-checked-ago">Checked ${checkedAgo}</span>` : '';
+
+  section.innerHTML = `<div class="dailies-section">
+    <div class="dailies-header">
+      <div class="dailies-title-row">
+        <span class="dailies-title">${GP_ICON} Dailies</span>
+        <span class="daily-progress">${progressDots} <span class="daily-progress-text">${claimsCount}/${maxClaims}</span></span>
+      </div>
+      <div class="dailies-meta-row">
+        ${checkedHint}
+        <button class="daily-refresh-btn" id="daily-refresh-btn">Refresh</button>
+        <span class="daily-reset-timer" id="daily-reset-timer"></span>
+      </div>
+    </div>
+    ${allDone ? `<div class="dailies-done">All done for today! Come back tomorrow.</div>` : ''}
+    <div class="dailies-grid">${itemsHTML}</div>
+    <div class="dailies-hint">Only public GitHub activity counts. Recent activity may take a few minutes to appear.</div>
+  </div>`;
+
+  // Wire up claim buttons
+  section.querySelectorAll('.daily-claim-btn').forEach(btn => {
+    btn.addEventListener('click', () => claimDaily(btn.dataset.dailyClaim));
+  });
+
+  // Wire up refresh button
+  const refreshBtn = document.getElementById('daily-refresh-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', refreshDailies);
+
+  // Start countdown to reset
+  startDailyCountdown(resetAt);
+}
+
+function formatTimeAgo(date) {
+  const diff = Date.now() - date.getTime();
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  return `${Math.floor(diff / 3600000)}h ago`;
+}
+
+function startDailyCountdown(resetAt) {
+  if (dailyCountdownInterval) clearInterval(dailyCountdownInterval);
+  if (!resetAt) return;
+
+  const target = new Date(resetAt).getTime();
+
+  function update() {
+    const el = document.getElementById('daily-reset-timer');
+    if (!el) { clearInterval(dailyCountdownInterval); return; }
+    const remaining = target - Date.now();
+    if (remaining <= 0) {
+      el.textContent = 'Resetting...';
+      clearInterval(dailyCountdownInterval);
+      setTimeout(() => loadDailies(), 1500);
+      return;
+    }
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    el.textContent = `Resets in ${h}h ${String(m).padStart(2, '0')}m`;
+  }
+
+  update();
+  dailyCountdownInterval = setInterval(update, 60000);
+}
+
+async function claimDaily(eventType) {
+  const btn = document.querySelector(`[data-daily-claim="${eventType}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Claiming...'; }
+
+  try {
+    const res = await fetch('/api/dailies/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_type: eventType }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (packState) packState.bonusPacks = data.newBonusPacks;
+      renderTopBarPacks();
+      if (repoLoaded) renderRepoInfoFromCurrent();
+      // Re-fetch full dailies state to re-render
+      loadDailies();
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Claim +1'; }
+    }
+  } catch {
+    if (btn) { btn.disabled = false; btn.textContent = 'Claim +1'; }
+  }
+}
+
+async function refreshDailies() {
+  const btn = document.getElementById('daily-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
+
+  try {
+    const res = await fetch('/api/dailies/refresh', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      const section = document.getElementById('dailies-section');
+      if (section) renderDailies(section, data);
+    }
+  } catch { /* silent */ }
+
+  if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
 }
 
 // Load pack state for top bar (all users)
@@ -659,12 +827,16 @@ function renderRepoInfo(owner, repo) {
   // Pack state UI for logged-in users
   let packHTML = '';
   if (_currentUser && packState) {
-    const { readyPacks, maxPacks, nextRegenAt } = packState;
+    const { readyPacks, bonusPacks = 0, maxPacks, nextRegenAt } = packState;
+    const totalPacks = bonusPacks + readyPacks;
+    const bonusDisplay = bonusPacks > 0
+      ? `<span class="pack-count-bonus">${bonusPacks}</span><span class="pack-count-plus">+</span>`
+      : '';
     packHTML = `<div class="pack-state">
       <div class="pack-count">
         <span class="pack-count-icon">${GP_ICON}</span>
-        <span class="pack-count-num">${readyPacks}</span>
-        <span class="pack-count-label">pack${readyPacks !== 1 ? 's' : ''} <span class="pack-any-repo">usable on any repo</span></span>
+        ${bonusDisplay}<span class="pack-count-num">${readyPacks}<span class="pack-count-max">/${maxPacks}</span></span>
+        <span class="pack-count-label">pack${totalPacks !== 1 ? 's' : ''} <span class="pack-any-repo">usable on any repo</span></span>
       </div>
       ${readyPacks < maxPacks && nextRegenAt ? `<div class="pack-regen"><span class="pack-regen-label">Next pack in</span><span class="pack-regen-time" id="pack-countdown">--:--</span></div>` : ''}
     </div>`;
@@ -849,7 +1021,7 @@ function renderRepoInfo(owner, repo) {
     ${authNudge}
     <div class="repo-action-row">
       <div class="action-buttons">
-        <button class="btn-secondary" id="open-pack-btn" ${total === 0 ? 'disabled' : ''} ${_currentUser && packState && packState.readyPacks <= 0 ? 'disabled' : ''} ${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'disabled' : ''}>${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'Sign In to Open Packs' : 'Open Pack'}</button>
+        <button class="btn-secondary" id="open-pack-btn" ${total === 0 ? 'disabled' : ''} ${_currentUser && packState && ((packState.bonusPacks || 0) + packState.readyPacks) <= 0 ? 'disabled' : ''} ${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'disabled' : ''}>${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'Sign In to Open Packs' : 'Open Pack'}</button>
         ${packHTML}
       </div>
     </div>
@@ -1002,7 +1174,7 @@ async function openPack() {
   if (!allContributors.length || packOpen) return;
 
   // Check pack availability for logged-in users
-  if (_currentUser && packState && packState.readyPacks <= 0) {
+  if (_currentUser && packState && ((packState.bonusPacks || 0) + packState.readyPacks) <= 0) {
     return; // No packs available
   }
 
@@ -1024,7 +1196,7 @@ async function openPack() {
           renderRepoInfoFromCurrent();
         } else {
           // No packs available (logged-in user)
-          packState = { readyPacks: 0, maxPacks: 2, nextRegenAt: errData.nextRegenAt };
+          packState = { readyPacks: 0, bonusPacks: 0, maxPacks: 2, nextRegenAt: errData.nextRegenAt };
           renderRepoInfoFromCurrent();
         }
       }
@@ -1319,7 +1491,7 @@ function revealCards(overlay, picks, onComplete) {
               renderTopBarPacks();
             } else if (res.status === 429) {
               const errData = await res.json().catch(() => ({}));
-              packState = { readyPacks: 0, maxPacks: 2, nextRegenAt: errData.nextRegenAt };
+              packState = { readyPacks: 0, bonusPacks: 0, maxPacks: 2, nextRegenAt: errData.nextRegenAt };
               renderTopBarPacks();
             }
           } catch { /* handled below */ }
@@ -1393,8 +1565,9 @@ function revealCards(overlay, picks, onComplete) {
         // Show pack count and hide button if no packs left
         let hasMorePacks = true;
         if (_currentUser && packState) {
-          anotherBtn.textContent = packState.readyPacks > 0 ? `Open Another (${packState.readyPacks})` : 'No Packs Left';
-          if (packState.readyPacks <= 0) hasMorePacks = false;
+          const totalAvail = (packState.bonusPacks || 0) + packState.readyPacks;
+          anotherBtn.textContent = totalAvail > 0 ? `Open Another (${totalAvail})` : 'No Packs Left';
+          if (totalAvail <= 0) hasMorePacks = false;
         } else if (!_currentUser) {
           const limitReached = localStorage.getItem('gp_guest_limit_reached');
           if (limitReached || guestPacksRemaining <= 0) {

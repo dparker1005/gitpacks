@@ -12,7 +12,7 @@ export async function GET() {
       return NextResponse.json({ error: 'Not authenticated', detail: authError?.message }, { status: 401 });
     }
 
-    const profile = await getOrCreateProfile(supabase, user, 'ready_packs, last_regen_at');
+    const profile = await getOrCreateProfile(supabase, user, 'ready_packs, bonus_packs, last_regen_at');
     if (!profile) {
       return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
     }
@@ -35,6 +35,7 @@ export async function GET() {
 
     return NextResponse.json({
       readyPacks: regen.readyPacks,
+      bonusPacks: profile.bonus_packs,
       maxPacks: MAX_PACKS,
       nextRegenAt,
     });

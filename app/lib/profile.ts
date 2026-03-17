@@ -5,6 +5,7 @@ export interface Profile {
   github_username: string;
   avatar_url: string;
   ready_packs: number;
+  bonus_packs: number;
   last_regen_at: string;
   total_points: number;
 }
@@ -15,7 +16,7 @@ export interface Profile {
 export async function getOrCreateProfile(
   supabase: any,
   user: User,
-  select = 'id, github_username, avatar_url, ready_packs, last_regen_at'
+  select = 'id, github_username, avatar_url, ready_packs, bonus_packs, last_regen_at'
 ): Promise<Profile | null> {
   const { data: profile } = await supabase
     .from('profiles')
@@ -31,7 +32,7 @@ export async function getOrCreateProfile(
       id: user.id,
       github_username: meta.user_name || meta.preferred_username || '',
       avatar_url: meta.avatar_url || '',
-      ready_packs: 10,
+      bonus_packs: 10,
     },
     { onConflict: 'id', ignoreDuplicates: true }
   );

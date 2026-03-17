@@ -69,7 +69,7 @@ export async function GET(
   // --- Authenticated flow ---
 
   // 1. Ensure profile exists, apply regen, then atomically decrement pack
-  const profile = await getOrCreateProfile(supabase, user, 'ready_packs, last_regen_at');
+  const profile = await getOrCreateProfile(supabase, user, 'ready_packs, bonus_packs, last_regen_at');
   if (!profile) {
     return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
   }
@@ -100,12 +100,13 @@ export async function GET(
   if (!result?.success) {
     const nextRegenAt = regen.lastRegenAt + REGEN_INTERVAL_MS;
     return NextResponse.json(
-      { error: 'No packs available', nextRegenAt, readyPacks: 0 },
+      { error: 'No packs available', nextRegenAt, readyPacks: 0, bonusPacks: 0 },
       { status: 429 }
     );
   }
 
   const readyPacks = result.new_ready_packs;
+  const bonusPacks = result.new_bonus_packs;
   const lastRegenAt = new Date(result.new_last_regen_at).getTime();
 
   // 2. Get pity state for this repo
@@ -185,6 +186,7 @@ export async function GET(
     cards,
     packState: {
       readyPacks,
+      bonusPacks,
       maxPacks: MAX_PACKS,
       nextRegenAt,
     },

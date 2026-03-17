@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   github_username TEXT NOT NULL DEFAULT '',
   avatar_url TEXT DEFAULT '',
-  ready_packs INTEGER NOT NULL DEFAULT 10,
+  ready_packs INTEGER NOT NULL DEFAULT 0,
+  bonus_packs INTEGER NOT NULL DEFAULT 0,
   last_regen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   total_points INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -75,6 +76,23 @@ CREATE TABLE IF NOT EXISTS collection_completions (
   PRIMARY KEY (user_id, owner_repo)
 );
 
+-- Daily claims (dailies feature)
+CREATE TABLE IF NOT EXISTS daily_claims (
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  claim_date DATE NOT NULL DEFAULT (CURRENT_DATE AT TIME ZONE 'UTC'),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (user_id, event_type, claim_date)
+);
+
+-- Daily detections cache (server-side GitHub event detection cache)
+CREATE TABLE IF NOT EXISTS daily_detections (
+  user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  detected_types TEXT[] NOT NULL DEFAULT '{}',
+  check_date DATE NOT NULL DEFAULT (CURRENT_DATE AT TIME ZONE 'UTC'),
+  last_checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Leaderboard scores (cached, event-driven updates)
 CREATE TABLE IF NOT EXISTS leaderboard_scores (
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
@@ -105,6 +123,8 @@ ALTER TABLE user_packs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_self_cards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE collection_completions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_claims ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_detections ENABLE ROW LEVEL SECURITY;
 ALTER TABLE leaderboard_scores ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: publicly readable (non-sensitive fields only), users can update/insert own
@@ -135,6 +155,17 @@ CREATE POLICY "Allow insert achievements" ON user_achievements FOR INSERT WITH C
 
 -- Collection completions: publicly readable (leaderboard needs cross-user access, writes via RPC only)
 CREATE POLICY "Completions are publicly readable" ON collection_completions FOR SELECT USING (true);
+
+-- Daily claims: users can manage their own
+CREATE POLICY "Users read own daily claims" ON daily_claims FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users insert own daily claims" ON daily_claims FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE INDEX IF NOT EXISTS idx_daily_claims_user_date ON daily_claims(user_id, claim_date);
+
+-- Daily detections: users can manage their own
+CREATE POLICY "Users read own detections" ON daily_detections FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users upsert own detections" ON daily_detections FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users update own detections" ON daily_detections FOR UPDATE USING (auth.uid() = user_id);
 
 -- Leaderboard scores: publicly readable (writes via RPC only)
 CREATE POLICY "Leaderboard is publicly readable" ON leaderboard_scores FOR SELECT USING (true);
@@ -462,41 +493,89 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Atomic pack decrement: returns false if no packs available (race-safe)
+-- Atomic pack decrement: consume ready_packs first (they regen), then bonus_packs (race-safe)
+DROP FUNCTION IF EXISTS decrement_pack(UUID, INT);
 CREATE OR REPLACE FUNCTION decrement_pack(
   p_user_id UUID,
   p_max_packs INT DEFAULT 2
-) RETURNS TABLE(success BOOLEAN, new_ready_packs INT, new_last_regen_at TIMESTAMPTZ) AS $$
+) RETURNS TABLE(success BOOLEAN, new_ready_packs INT, new_bonus_packs INT, new_last_regen_at TIMESTAMPTZ) AS $$
 DECLARE
   cur_packs INT;
+  cur_bonus INT;
   cur_regen TIMESTAMPTZ;
 BEGIN
   IF auth.uid() IS DISTINCT FROM p_user_id THEN
     RAISE EXCEPTION 'unauthorized';
   END IF;
 
-  SELECT ready_packs, last_regen_at INTO cur_packs, cur_regen
+  SELECT ready_packs, bonus_packs, last_regen_at INTO cur_packs, cur_bonus, cur_regen
   FROM profiles WHERE id = p_user_id FOR UPDATE;
 
   IF cur_packs IS NULL THEN
-    RETURN QUERY SELECT false, 0, NOW();
+    RETURN QUERY SELECT false, 0, 0, NOW();
     RETURN;
   END IF;
 
-  IF cur_packs <= 0 THEN
-    RETURN QUERY SELECT false, 0, cur_regen;
+  -- Try ready_packs first (they regenerate)
+  IF cur_packs > 0 THEN
+    IF cur_packs >= p_max_packs AND (cur_packs - 1) < p_max_packs THEN
+      cur_regen := NOW();
+    END IF;
+
+    UPDATE profiles
+    SET ready_packs = cur_packs - 1, last_regen_at = cur_regen
+    WHERE id = p_user_id;
+
+    RETURN QUERY SELECT true, (cur_packs - 1)::INT, cur_bonus, cur_regen;
     RETURN;
   END IF;
 
-  IF cur_packs >= p_max_packs AND (cur_packs - 1) < p_max_packs THEN
-    cur_regen := NOW();
+  -- Then bonus_packs
+  IF cur_bonus > 0 THEN
+    UPDATE profiles SET bonus_packs = cur_bonus - 1 WHERE id = p_user_id;
+    RETURN QUERY SELECT true, cur_packs, (cur_bonus - 1)::INT, cur_regen;
+    RETURN;
   END IF;
 
-  UPDATE profiles
-  SET ready_packs = cur_packs - 1, last_regen_at = cur_regen
-  WHERE id = p_user_id;
+  -- No packs available
+  RETURN QUERY SELECT false, 0, 0, cur_regen;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-  RETURN QUERY SELECT true, (cur_packs - 1)::INT, cur_regen;
+-- Atomic daily claim: checks max 3/day, inserts claim, increments bonus_packs
+CREATE OR REPLACE FUNCTION claim_daily(
+  p_user_id UUID,
+  p_event_type TEXT
+) RETURNS TABLE(success BOOLEAN, new_bonus_packs INT, claims_today INT) AS $$
+DECLARE
+  today DATE := (NOW() AT TIME ZONE 'UTC')::DATE;
+  cur_claims INT;
+  cur_bonus INT;
+BEGIN
+  IF auth.uid() IS DISTINCT FROM p_user_id THEN
+    RAISE EXCEPTION 'unauthorized';
+  END IF;
+
+  SELECT COUNT(*) INTO cur_claims
+  FROM daily_claims WHERE user_id = p_user_id AND claim_date = today;
+
+  IF cur_claims >= 3 THEN
+    RETURN QUERY SELECT false, 0, cur_claims;
+    RETURN;
+  END IF;
+
+  BEGIN
+    INSERT INTO daily_claims (user_id, event_type, claim_date)
+    VALUES (p_user_id, p_event_type, today);
+  EXCEPTION WHEN unique_violation THEN
+    RETURN QUERY SELECT false, 0, cur_claims;
+    RETURN;
+  END;
+
+  UPDATE profiles SET bonus_packs = bonus_packs + 1 WHERE id = p_user_id
+  RETURNING bonus_packs INTO cur_bonus;
+
+  RETURN QUERY SELECT true, cur_bonus, (cur_claims + 1);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

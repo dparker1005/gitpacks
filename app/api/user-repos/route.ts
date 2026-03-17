@@ -85,5 +85,7 @@ export async function GET() {
 
   result.sort((a, b) => b.pct - a.pct || b.cards - a.cards);
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, {
+    headers: { 'Cache-Control': 'private, max-age=60' },
+  });
 }

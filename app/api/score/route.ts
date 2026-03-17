@@ -40,5 +40,7 @@ export async function GET() {
     repos_collected: repos.length,
     repos_completed: reposCompleted,
     repos_insured: reposInsured || 0,
+  }, {
+    headers: { 'Cache-Control': 'private, max-age=60' },
   });
 }

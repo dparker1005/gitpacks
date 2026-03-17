@@ -102,7 +102,9 @@ export async function GET() {
       return b.stars - a.stars;
     });
 
-    return NextResponse.json(results);
+    return NextResponse.json(results, {
+      headers: { 'Cache-Control': 'private, max-age=3600' },
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message }, { status: 500 });
   }

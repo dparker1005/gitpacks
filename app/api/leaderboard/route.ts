@@ -63,5 +63,7 @@ export async function GET(request: NextRequest) {
     entries,
     total_entries: count || 0,
     repo: repo || null,
+  }, {
+    headers: { 'Cache-Control': 'public, max-age=300, s-maxage=300' },
   });
 }

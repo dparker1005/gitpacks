@@ -68,8 +68,18 @@ export async function GET(
 
   // --- Authenticated flow ---
 
-  // 1. Ensure profile exists, apply regen, then atomically decrement pack
-  const profile = await getOrCreateProfile(supabase, user, 'ready_packs, bonus_packs, last_regen_at');
+  // 1. Fetch profile and pity state in parallel, then apply regen and decrement
+  const [profileResult, pityResult] = await Promise.all([
+    getOrCreateProfile(supabase, user, 'ready_packs, bonus_packs, last_regen_at'),
+    supabase
+      .from('user_packs')
+      .select('total_opened, packs_since_legendary, packs_since_mythic')
+      .eq('user_id', user.id)
+      .eq('owner_repo', cacheKey)
+      .single(),
+  ]);
+
+  const profile = profileResult;
   if (!profile) {
     return NextResponse.json({ error: 'Failed to create profile' }, { status: 500 });
   }
@@ -109,13 +119,8 @@ export async function GET(
   const bonusPacks = result.new_bonus_packs;
   const lastRegenAt = new Date(result.new_last_regen_at).getTime();
 
-  // 2. Get pity state for this repo
-  const { data: pityData } = await supabase
-    .from('user_packs')
-    .select('total_opened, packs_since_legendary, packs_since_mythic')
-    .eq('user_id', user.id)
-    .eq('owner_repo', cacheKey)
-    .single();
+  // 2. Use pity state fetched in parallel above
+  const { data: pityData } = pityResult;
 
   const packsOpened = pityData?.total_opened ?? 0;
   const packsSinceLegendary = pityData?.packs_since_legendary ?? 0;

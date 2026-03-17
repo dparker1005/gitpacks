@@ -14,7 +14,9 @@ export async function GET() {
         fetched_at: row.fetched_at,
       }));
       repos.sort((a: any, b: any) => b.cards - a.cards);
-      return NextResponse.json(repos);
+      return NextResponse.json(repos, {
+        headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+      });
     }
 
     // Fallback: fetch with data column and compute count
@@ -33,7 +35,9 @@ export async function GET() {
     }));
 
     repos.sort((a: any, b: any) => b.cards - a.cards);
-    return NextResponse.json(repos);
+    return NextResponse.json(repos, {
+      headers: { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' },
+    });
   } catch {
     return NextResponse.json([]);
   }

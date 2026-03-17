@@ -51,6 +51,25 @@ function clearSpaceAction() { _spaceAction = null; }
 const searchContainer = document.getElementById('search-container');
 const popularRepos = document.getElementById('popular-repos');
 
+// ===== CLIENT-SIDE CACHE =====
+const _cache = {};
+function cacheGet(key, maxAgeMs) {
+  const entry = _cache[key];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > maxAgeMs) { delete _cache[key]; return null; }
+  return entry.data;
+}
+function cacheSet(key, data) { _cache[key] = { data, ts: Date.now() }; }
+function cacheInvalidate(...prefixes) {
+  for (const k of Object.keys(_cache)) {
+    if (prefixes.some(p => k.startsWith(p))) delete _cache[k];
+  }
+}
+// Invalidate caches that depend on card acquisition
+function invalidateCardCaches() {
+  cacheInvalidate('leaderboard', 'score', 'user-repos');
+}
+
 // Store referral code from URL (belt and suspenders with page.tsx)
 const _urlRef = new URLSearchParams(window.location.search).get('ref');
 if (_urlRef) localStorage.setItem('gp_ref', _urlRef);
@@ -202,9 +221,19 @@ function startPackCountdown() {
 async function loadPopularRepos() {
   popularRepos.innerHTML = `<div style="text-align:center;padding:60px 20px"><div class="spinner"></div></div>`;
   try {
-    const res = await fetch('/api/repos');
-    if (!res.ok) return;
-    const repos = await res.json();
+    // Fetch popular repos and user repos in parallel (with client cache)
+    let repos = cacheGet('repos', 300000); // 5 min client cache
+    let userReposFromCache = _currentUser ? cacheGet('user-repos', 60000) : null; // 1 min
+    const [reposRes, urRes] = await Promise.all([
+      repos ? Promise.resolve(null) : fetch('/api/repos'),
+      userReposFromCache || !_currentUser ? Promise.resolve(null) : fetch('/api/user-repos'),
+    ]);
+    if (!repos) {
+      if (!reposRes || !reposRes.ok) return;
+      repos = await reposRes.json();
+      cacheSet('repos', repos);
+    }
+    repos = JSON.parse(JSON.stringify(repos)); // deep clone so we don't mutate cache
     if (!repos.length) {
       popularRepos.innerHTML = `<div class="popular-section">
         <p class="popular-hint">Enter a GitHub repo above to get started!</p>
@@ -212,13 +241,9 @@ async function loadPopularRepos() {
       return;
     }
 
-    // For logged-in users, fetch their repos from DB
-    let userRepos = [];
-    if (_currentUser) {
-      try {
-        const urRes = await fetch('/api/user-repos');
-        if (urRes.ok) userRepos = await urRes.json();
-      } catch { /* silent */ }
+    let userRepos = userReposFromCache || [];
+    if (!userReposFromCache && urRes && urRes.ok) {
+      try { userRepos = await urRes.json(); cacheSet('user-repos', userRepos); } catch { /* silent */ }
     }
 
     // For logged-out users, use localStorage
@@ -489,20 +514,24 @@ async function loadLeaderboard() {
   if (!section) return;
 
   try {
+    let entries = cacheGet('leaderboard', 300000)?.entries; // 5 min
+    let userScore = _currentUser ? cacheGet('score', 60000) : null; // 1 min
+
     const [lbRes, scoreRes] = await Promise.all([
-      fetch('/api/leaderboard?limit=10'),
-      _currentUser ? fetch('/api/score') : Promise.resolve(null),
+      entries ? Promise.resolve(null) : fetch('/api/leaderboard?limit=10'),
+      userScore || !_currentUser ? Promise.resolve(null) : fetch('/api/score'),
     ]);
 
-    let entries = [];
-    if (lbRes.ok) {
+    if (!entries && lbRes && lbRes.ok) {
       const data = await lbRes.json();
       entries = data.entries || [];
+      cacheSet('leaderboard', data);
     }
+    entries = entries || [];
 
-    let userScore = null;
-    if (scoreRes && scoreRes.ok) {
+    if (!userScore && scoreRes && scoreRes.ok) {
       userScore = await scoreRes.json();
+      cacheSet('score', userScore);
     }
 
     let html = `<h3 class="popular-title">Leaderboard</h3>`;
@@ -1301,6 +1330,7 @@ async function openPack() {
     picks = data.cards;
     if (data.packState) {
       packState = data.packState;
+      invalidateCardCaches();
     }
     if (data.guestPacksRemaining !== undefined) {
       guestPacksRemaining = data.guestPacksRemaining;
@@ -1567,7 +1597,7 @@ function revealCards(overlay, picks, onComplete) {
               if (Array.isArray(d)) { nextPicks = d; }
               else {
                 nextPicks = d.cards;
-                if (d.packState) packState = d.packState;
+                if (d.packState) { packState = d.packState; invalidateCardCaches(); }
                 if (d.guestPacksRemaining !== undefined) { guestPacksRemaining = d.guestPacksRemaining; localStorage.setItem('gp_guest_packs_remaining', String(guestPacksRemaining)); }
               }
               renderTopBarPacks();
@@ -1824,6 +1854,7 @@ async function claimMilestone(statType, threshold) {
     }
 
     // Update the achievements panel
+    invalidateCardCaches();
     renderRepoInfoFromCurrent();
 
     // Open the pack reveal with the drawn cards
@@ -2739,6 +2770,7 @@ async function revertSingleCard(c) {
     // Update local state inline
     if (library[c.login]) library[c.login]--;
     starBalance += data.starsEarned || 0;
+    invalidateCardCaches();
     saveLibrary();
     return { starsEarned: data.starsEarned || 0 };
   } catch (err) {
@@ -2761,6 +2793,7 @@ async function cherryPickCard(c) {
     // Update local state
     library[c.login] = (library[c.login] || 0) + 1;
     starBalance = data.newBalance;
+    invalidateCardCaches();
     saveLibrary();
     return { success: true, newBalance: data.newBalance };
   } catch (err) {

@@ -21,11 +21,15 @@ function getHeaders(): Record<string, string> {
 // ===== fetchWithRetry =====
 async function fetchWithRetry(url: string): Promise<any> {
   const headers = getHeaders();
-  const maxAttempts = 10;
+  const maxAttempts = 8;
+  const maxWaitMs = 45000; // 45s total timeout
+  const start = Date.now();
   for (let i = 0; i < maxAttempts; i++) {
     const res = await fetch(url, { headers });
     if (res.status === 202) {
-      await sleep(3000 + i * 1000);
+      const delay = Math.min(2000 * Math.pow(1.5, i), 8000); // exponential backoff, cap 8s
+      if (Date.now() - start + delay > maxWaitMs) break;
+      await sleep(delay);
       continue;
     }
     if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
@@ -46,17 +50,7 @@ async function fetchAllIssues(
     else if (avatar && !stats[login].avatar) stats[login].avatar = avatar;
   };
 
-  let page = 1;
-  while (true) {
-    const url = `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${page}`;
-    const res = await fetch(url, { headers });
-    if (res.status === 403 || res.status === 429) {
-      if (page === 1) throw new Error('Rate limited fetching issues. Add a GitHub token for higher limits.');
-      break;
-    }
-    if (!res.ok) break;
-    const data = await res.json();
-    if (!data.length) break;
+  const processPage = (data: any[]) => {
     data.forEach((item: any) => {
       if (!item.user || !item.user.login) return;
       const login = item.user.login;
@@ -67,8 +61,35 @@ async function fetchAllIssues(
         stats[login].issues++;
       }
     });
-    page++;
-    if (page > 50) break;
+  };
+
+  // Fetch pages in parallel batches of 5
+  let page = 1;
+  let done = false;
+  while (!done && page <= 50) {
+    const batch = [];
+    for (let i = 0; i < 5 && page + i <= 50; i++) {
+      const p = page + i;
+      batch.push(
+        fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${p}`, { headers })
+          .then(async (res) => {
+            if (res.status === 403 || res.status === 429) return { page: p, data: null, rateLimited: true };
+            if (!res.ok) return { page: p, data: null, rateLimited: false };
+            const data = await res.json();
+            return { page: p, data, rateLimited: false };
+          })
+      );
+    }
+    const results = await Promise.all(batch);
+    for (const r of results.sort((a, b) => a.page - b.page)) {
+      if (r.rateLimited) {
+        if (r.page === 1) throw new Error('Rate limited fetching issues. Add a GitHub token for higher limits.');
+        done = true; break;
+      }
+      if (!r.data || !r.data.length) { done = true; break; }
+      processPage(r.data);
+    }
+    page += 5;
   }
 
   return stats;
@@ -80,13 +101,22 @@ async function fetchPaginatedContributors(
 ): Promise<Array<{ login: string; avatar: string; contributions: number }>> {
   const headers = getHeaders();
   const all: Array<{ login: string; avatar: string; contributions: number }> = [];
-  for (let page = 1; page <= 10; page++) {
-    const url = `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=100&page=${page}`;
-    const res = await fetch(url, { headers });
-    if (!res.ok) break;
-    const data = await res.json();
-    if (!data.length) break;
-    data.forEach((c: any) => {
+
+  // Fetch all 10 pages in parallel
+  const fetches = Array.from({ length: 10 }, (_, i) =>
+    fetch(`https://api.github.com/repos/${owner}/${repo}/contributors?per_page=100&page=${i + 1}`, { headers })
+      .then(async (res) => {
+        if (!res.ok) return { page: i + 1, data: [] };
+        const data = await res.json();
+        return { page: i + 1, data: Array.isArray(data) ? data : [] };
+      })
+      .catch(() => ({ page: i + 1, data: [] as any[] }))
+  );
+  const results = await Promise.all(fetches);
+
+  for (const r of results.sort((a, b) => a.page - b.page)) {
+    if (!r.data.length) break;
+    r.data.forEach((c: any) => {
       if (c.login && c.type !== 'Bot') {
         all.push({ login: c.login, avatar: c.avatar_url, contributions: c.contributions });
       }
@@ -506,7 +536,9 @@ export async function GET(
   if (!refresh) {
     const cached = await getCachedRepo(cacheKey);
     if (cached) {
-      return NextResponse.json(cached);
+      return NextResponse.json(cached, {
+        headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+      });
     }
   }
 
@@ -543,7 +575,9 @@ export async function GET(
     // Cache result
     await setCachedRepo(cacheKey, result);
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+    });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }

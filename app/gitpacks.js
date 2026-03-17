@@ -870,18 +870,14 @@ function renderRepoInfo(owner, repo) {
   // Pack state UI for logged-in users
   let packHTML = '';
   if (_currentUser && packState) {
-    const { readyPacks, bonusPacks = 0, maxPacks, nextRegenAt } = packState;
+    const { readyPacks, bonusPacks = 0 } = packState;
     const totalPacks = bonusPacks + readyPacks;
-    const bonusDisplay = bonusPacks > 0
-      ? `<span class="pack-count-bonus">${bonusPacks}</span><span class="pack-count-plus">+</span>`
-      : '';
     packHTML = `<div class="pack-state">
       <div class="pack-count">
         <span class="pack-count-icon">${GP_ICON}</span>
-        ${bonusDisplay}<span class="pack-count-num">${readyPacks}<span class="pack-count-max">/${maxPacks}</span></span>
+        <span class="pack-count-num">${totalPacks}</span>
         <span class="pack-count-label">pack${totalPacks !== 1 ? 's' : ''} <span class="pack-any-repo">usable on any repo</span></span>
       </div>
-      ${readyPacks < maxPacks && nextRegenAt ? `<div class="pack-regen"><span class="pack-regen-label">Next pack in</span><span class="pack-regen-time" id="pack-countdown">--:--</span></div>` : ''}
     </div>`;
   }
 

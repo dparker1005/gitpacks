@@ -239,11 +239,12 @@ async function loadPopularRepos() {
         ? `<div class="repo-progress-bar"><div class="repo-progress-fill" style="width:${pctNum}%"></div></div>`
         : '';
       return `<button class="popular-repo-btn${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
-          <span class="popular-repo-name">${r.name}${progressBar}</span>
+          <span class="popular-repo-name">${r.name}</span>
           <span class="popular-repo-meta">
             <span class="popular-repo-progress">${r.collected}/${r.cards}</span>
             <span class="popular-repo-pct">${pctNum}%</span>
           </span>
+          ${progressBar}
         </button>`;
     }
 
@@ -260,11 +261,12 @@ async function loadPopularRepos() {
         ? `<span class="repo-points">${r.base_points.toLocaleString()} pts${bonusHTML}</span>`
         : '';
       return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
-          <span class="popular-repo-name">${r.name}${progressBar}</span>
+          <span class="popular-repo-name">${r.name}</span>
           <span class="popular-repo-meta-stacked">
             <span class="popular-repo-progress">${r.collected}/${r.cards} cards</span>
             ${pointsHTML}
           </span>
+          ${progressBar}
         </button>`;
     }
 

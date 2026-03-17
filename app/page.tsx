@@ -81,9 +81,9 @@ export default function Home() {
   });
 
   function handleLogout() {
-    // Clear library localStorage cache so logged-out view doesn't show logged-in cards
+    // Clear all guest/collection localStorage so logged-out view starts fresh
     Object.keys(localStorage).forEach(key => {
-      if (key.startsWith('ghtc_lib_')) localStorage.removeItem(key);
+      if (key.startsWith('ghtc_lib_') || key.startsWith('gp_guest')) localStorage.removeItem(key);
     });
     const supabase = getSupabaseBrowser();
     supabase.auth.signOut().then(() => {

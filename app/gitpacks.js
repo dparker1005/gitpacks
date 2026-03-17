@@ -232,6 +232,7 @@ async function loadPopularRepos() {
       });
     } else {
       // Merge user repo data (including scores) with all repos
+      const repoNameSet = new Set(repos.map(r => r.name.toLowerCase()));
       repos.forEach(r => {
         const ur = userRepos.find(u => u.name === r.name.toLowerCase());
         r.collected = ur ? ur.collected : 0;
@@ -240,6 +241,13 @@ async function loadPopularRepos() {
         r.completion_bonus = ur ? ur.completion_bonus : 0;
         r.total_points = ur ? ur.total_points : 0;
         r.my_rarity = ur ? ur.my_rarity : null;
+        r.stars = ur ? ur.stars : 0;
+      });
+      // Add user repos not in the popular list
+      userRepos.forEach(ur => {
+        if (!repoNameSet.has(ur.name.toLowerCase())) {
+          repos.push({ name: ur.name, cards: ur.cards, collected: ur.collected, pct: ur.pct, base_points: ur.base_points, completion_bonus: ur.completion_bonus, total_points: ur.total_points, my_rarity: ur.my_rarity, stars: ur.stars });
+        }
       });
     }
 

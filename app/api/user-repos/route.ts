@@ -34,8 +34,8 @@ export async function GET() {
   const meta = user.user_metadata || {};
   const githubUsername = meta.user_name || meta.preferred_username || '';
 
-  // Fetch repo cache card counts + timestamps, scores + timestamps, stars, and contributor rarities in parallel
-  const [cacheResult, scoresResult, starsResult, rarityResult] = await Promise.all([
+  // Fetch repo cache card counts + timestamps, scores + timestamps, stars, completions, and contributor rarities in parallel
+  const [cacheResult, scoresResult, starsResult, completionsResult, rarityResult] = await Promise.all([
     anonSupabase
       .from('repo_cache')
       .select('owner_repo, card_count, fetched_at')
@@ -48,6 +48,11 @@ export async function GET() {
     supabase
       .from('user_stars')
       .select('owner_repo, balance')
+      .eq('user_id', user.id)
+      .in('owner_repo', repoNames),
+    supabase
+      .from('collection_completions')
+      .select('owner_repo, is_complete, insured')
       .eq('user_id', user.id)
       .in('owner_repo', repoNames),
     githubUsername
@@ -77,6 +82,10 @@ export async function GET() {
   (starsData || []).forEach((s: any) => {
     starsMap[s.owner_repo] = s.balance || 0;
   });
+  const completionsMap: Record<string, { is_complete: boolean; insured: boolean }> = {};
+  (completionsResult.data || []).forEach((c: any) => {
+    completionsMap[c.owner_repo] = { is_complete: c.is_complete, insured: c.insured };
+  });
   const rarityMap: Record<string, string> = {};
   (rarityResult.data || []).forEach((r: any) => {
     rarityMap[r.owner_repo] = r.rarity;
@@ -86,6 +95,7 @@ export async function GET() {
     const cached = cacheData?.find((r: any) => r.owner_repo === name);
     const totalCards = cached?.card_count || 0;
     const score = scoresData?.find((s: any) => s.owner_repo === name);
+    const comp = completionsMap[name];
     return {
       name,
       collected: repoMap[name],
@@ -96,6 +106,7 @@ export async function GET() {
       total_points: score?.total_points || 0,
       my_rarity: rarityMap[name] || null,
       stars: starsMap[name] || 0,
+      was_complete: comp && !comp.is_complete ? true : false,
     };
   });
 

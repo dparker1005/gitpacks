@@ -48,6 +48,8 @@
     .popular-repo-btn.repo-complete { border-color:rgba(74,222,222,0.4); background:linear-gradient(135deg,rgba(120,115,245,0.08),rgba(74,222,222,0.08)); }
     .popular-repo-btn.repo-complete .popular-repo-pct { background:linear-gradient(135deg,#7873f5,#4adede); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; font-weight:700; }
     .popular-repo-btn.repo-complete::after { content:'Complete'; position:absolute; right:12px; top:-8px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:4px; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; }
+    .popular-repo-btn.repo-broken { border-color:rgba(251,146,60,0.35); background:linear-gradient(135deg,rgba(251,146,60,0.06),rgba(251,113,133,0.06)); }
+    .popular-repo-btn.repo-broken::after { content:'Broken Set'; position:absolute; right:12px; top:-8px; font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 8px; border-radius:4px; background:linear-gradient(135deg,#fb923c,#fb7185); color:#fff; }
     .popular-repo-btn { position:relative; }
     .popular-repo-name { font-weight:600; flex:1; min-width:0; }
     .my-rarity-badge { display:inline-block; font-family:'Orbitron',sans-serif; font-size:0.45rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 6px; border-radius:4px; margin-left:8px; vertical-align:middle; position:relative; top:-1px; }

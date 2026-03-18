@@ -280,11 +280,12 @@ async function loadPopularRepos() {
         r.total_points = ur ? ur.total_points : 0;
         r.my_rarity = ur ? ur.my_rarity : null;
         r.stars = ur ? ur.stars : 0;
+        r.was_complete = ur ? ur.was_complete : false;
       });
       // Add user repos not in the popular list
       userRepos.forEach(ur => {
         if (!repoNameSet.has(ur.name.toLowerCase())) {
-          repos.push({ name: ur.name, cards: ur.cards, collected: ur.collected, pct: ur.pct, base_points: ur.base_points, completion_bonus: ur.completion_bonus, total_points: ur.total_points, my_rarity: ur.my_rarity, stars: ur.stars });
+          repos.push({ name: ur.name, cards: ur.cards, collected: ur.collected, pct: ur.pct, base_points: ur.base_points, completion_bonus: ur.completion_bonus, total_points: ur.total_points, my_rarity: ur.my_rarity, stars: ur.stars, was_complete: ur.was_complete });
         }
       });
     }
@@ -334,7 +335,8 @@ async function loadPopularRepos() {
       const starsHint = isComplete && tradablePacks > 0
         ? `<div class="repo-stars-hint">&starf; ${r.stars} &rarr; ${tradablePacks} pack${tradablePacks !== 1 ? 's' : ''}</div>`
         : '';
-      return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}" data-repo="${r.name}">
+      const isBroken = !isComplete && r.was_complete;
+      return `<button class="popular-repo-btn scored${isComplete ? ' repo-complete' : ''}${isBroken ? ' repo-broken' : ''}" data-repo="${r.name}">
           <span class="popular-repo-name">${r.name}${myRarityBadge(r)}${progressBar}${starsHint}</span>
           <span class="popular-repo-meta-stacked">
             <span class="popular-repo-progress">${r.collected}/${r.cards} cards</span>

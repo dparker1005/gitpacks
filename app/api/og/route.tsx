@@ -95,7 +95,7 @@ function buildOgSvg(): string {
     <text x="${W / 2}" y="148" font-family="Orbitron" font-size="64" font-weight="900" fill="url(#title-grad)" text-anchor="middle" letter-spacing="4">GITPACKS</text>
 
     <!-- Beta tag -->
-    <g transform="translate(${W / 2 + 270}, 118)">
+    <g transform="translate(${W / 2 + 230}, 118)">
       <rect width="52" height="18" rx="4" fill="rgba(120,115,245,0.15)" stroke="rgba(120,115,245,0.3)" stroke-width="1" />
       <text x="26" y="13" font-family="Orbitron" font-size="7" font-weight="700" fill="#7873f5" text-anchor="middle" letter-spacing="2">BETA</text>
     </g>

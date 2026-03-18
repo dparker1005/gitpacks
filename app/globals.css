@@ -38,6 +38,14 @@
     .search-container input { width:420px; max-width:80vw; padding:14px 20px; border:2px solid #2a2a4a; border-radius:12px; background:rgba(20,20,40,0.8); color:#e0e0e0; font-size:1.05rem; font-family:'Rajdhani',sans-serif; transition:border-color 0.3s,box-shadow 0.3s; outline:none; }
     .search-container input:focus { border-color:#7873f5; box-shadow:0 0 20px rgba(120,115,245,0.2); }
     .search-container input::placeholder { color:#999; }
+
+    /* Inline search inside Discover */
+    .discover-search { display:flex; gap:8px; margin-bottom:12px; }
+    .discover-search input { flex:1; padding:10px 14px; border:1px solid #2a2a4a; border-radius:10px; background:rgba(20,20,40,0.6); color:#e0e0e0; font-size:0.85rem; font-family:'Rajdhani',sans-serif; transition:border-color 0.3s; outline:none; }
+    .discover-search input:focus { border-color:#7873f5; }
+    .discover-search input::placeholder { color:#666; }
+    .discover-search-btn { padding:10px 20px; border:1px solid rgba(120,115,245,0.3); border-radius:10px; background:rgba(120,115,245,0.1); color:#7873f5; font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+    .discover-search-btn:hover { background:rgba(120,115,245,0.2); border-color:rgba(120,115,245,0.5); }
     .popular-section { text-align:center; padding:20px 20px 40px; max-width:600px; margin:0 auto; }
     .popular-title { font-family:'Orbitron',sans-serif; font-size:0.7rem; color:#999; letter-spacing:3px; text-transform:uppercase; margin-bottom:16px; }
     .popular-hint { color:#999; font-size:0.95rem; }

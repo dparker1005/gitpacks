@@ -158,12 +158,6 @@ export default function Home() {
           </div>
         </div>
       )}
-      {(user || authLoading) && (
-        <div className="search-container" id="search-container">
-          <input type="text" id="repo-input" placeholder="owner/repo" />
-          <button id="generate-btn" className="btn-primary">Load Repo</button>
-        </div>
-      )}
       <div id="popular-repos"></div>
       <div id="error"></div>
       <div id="loading">

@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import { getCachedRepo } from '@/app/lib/repo-cache';
-import { redirect } from 'next/navigation';
 import CardRedirect from './CardRedirect';
 
 interface Params {
@@ -42,22 +40,9 @@ export default async function CardPage({
   params: Promise<Params>;
 }) {
   const { owner, repo, login } = await params;
-  const cacheKey = `${owner}/${repo}`.toLowerCase();
-  const cached = await getCachedRepo(cacheKey);
-
-  if (!cached || !Array.isArray(cached)) {
-    redirect(`/?repo=${owner}/${repo}`);
-  }
-
-  const contributor = cached.find(
-    (c: any) => c.login.toLowerCase() === login.toLowerCase()
-  );
-
-  if (!contributor) {
-    redirect(`/?repo=${owner}/${repo}`);
-  }
-
   const deepLink = `/?repo=${owner}/${repo}&card=${login}`;
 
+  // Always render HTML so OG crawlers see the meta tags.
+  // CardRedirect handles the client-side navigation (crawlers ignore JS).
   return <CardRedirect href={deepLink} />;
 }

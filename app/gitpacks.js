@@ -319,7 +319,7 @@ async function loadPopularRepos() {
       const progressBar = showProgressBar && !isComplete && r.cards > 0
         ? `<div class="repo-progress-bar"><div class="repo-progress-fill" style="width:${pctNum}%"></div></div>`
         : '';
-      const bonus = computeCompletionBonus(r.base_points || 0, isComplete);
+      const bonus = r.completion_bonus || 0;
       const bonusHTML = bonus > 0
         ? `<span class="repo-bonus">+${bonus.toLocaleString()} bonus</span>`
         : '';
@@ -379,13 +379,10 @@ async function loadPopularRepos() {
         </div>`;
       }
 
-      // Score total — derive from base_points + conditional bonus to stay consistent
+      // Score total — use DB values directly for consistency with leaderboard
       const totalBase = yourRepos.reduce((sum, r) => sum + (r.base_points || 0), 0);
-      const totalBonus = yourRepos.reduce((sum, r) => {
-        const complete = r.cards > 0 && r.collected >= r.cards;
-        return sum + computeCompletionBonus(r.base_points || 0, complete);
-      }, 0);
-      const totalPoints = totalBase + totalBonus;
+      const totalBonus = yourRepos.reduce((sum, r) => sum + (r.completion_bonus || 0), 0);
+      const totalPoints = yourRepos.reduce((sum, r) => sum + (r.total_points || 0), 0);
       if (totalPoints > 0) {
         html += `<div class="score-total">
           <span class="score-total-label">Total</span>

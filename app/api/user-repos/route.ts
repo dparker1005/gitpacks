@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
 import { supabase as anonSupabase } from '@/app/lib/repo-cache';
+import { refreshUserScores } from '@/app/lib/scoring';
 
 export async function GET() {
   const supabase = await getSupabaseServer();
@@ -33,15 +34,15 @@ export async function GET() {
   const meta = user.user_metadata || {};
   const githubUsername = meta.user_name || meta.preferred_username || '';
 
-  // Fetch repo cache card counts, scores, stars, and contributor rarities in parallel
+  // Fetch repo cache card counts + timestamps, scores + timestamps, stars, and contributor rarities in parallel
   const [cacheResult, scoresResult, starsResult, rarityResult] = await Promise.all([
     anonSupabase
       .from('repo_cache')
-      .select('owner_repo, card_count')
+      .select('owner_repo, card_count, fetched_at')
       .in('owner_repo', repoNames),
     anonSupabase
       .from('leaderboard_scores')
-      .select('owner_repo, base_points, completion_bonus, total_points')
+      .select('owner_repo, base_points, completion_bonus, total_points, updated_at')
       .eq('user_id', user.id)
       .in('owner_repo', repoNames),
     supabase
@@ -55,8 +56,23 @@ export async function GET() {
   ]);
 
   const cacheData = cacheResult.data;
-  const scoresData = scoresResult.data;
+  let scoresData = scoresResult.data;
   const starsData = starsResult.data;
+
+  // Lazy refresh: if any repo's score is older than its cache, recalculate all scores
+  const isStale = (cacheData || []).some((cache: any) => {
+    const score = (scoresData || []).find((s: any) => s.owner_repo === cache.owner_repo);
+    return !score || new Date(score.updated_at) < new Date(cache.fetched_at);
+  });
+  if (isStale) {
+    await refreshUserScores(supabase, user.id);
+    const refreshed = await anonSupabase
+      .from('leaderboard_scores')
+      .select('owner_repo, base_points, completion_bonus, total_points, updated_at')
+      .eq('user_id', user.id)
+      .in('owner_repo', repoNames);
+    scoresData = refreshed.data;
+  }
   const starsMap: Record<string, number> = {};
   (starsData || []).forEach((s: any) => {
     starsMap[s.owner_repo] = s.balance || 0;

@@ -323,10 +323,11 @@ async function loadPopularRepos() {
       const progressBar = showProgressBar && !isComplete && r.cards > 0
         ? `<div class="repo-progress-bar"><div class="repo-progress-fill" style="width:${pctNum}%"></div></div>`
         : '';
-      const bonusHTML = isComplete && r.completion_bonus > 0
-        ? `<span class="repo-bonus">+${r.completion_bonus.toLocaleString()} bonus</span>`
+      const bonus = computeCompletionBonus(r.base_points || 0, isComplete);
+      const bonusHTML = bonus > 0
+        ? `<span class="repo-bonus">+${bonus.toLocaleString()} bonus</span>`
         : '';
-      const pointsHTML = r.total_points > 0
+      const pointsHTML = r.base_points > 0
         ? `<span class="repo-points">${r.base_points.toLocaleString()} pts${bonusHTML}</span>`
         : '';
       const tradablePacks = r.stars >= 100 ? Math.floor(r.stars / 100) : 0;
@@ -381,11 +382,14 @@ async function loadPopularRepos() {
         </div>`;
       }
 
-      // Score total
-      const totalPoints = yourRepos.reduce((sum, r) => sum + (r.total_points || 0), 0);
+      // Score total — derive from base_points + conditional bonus to stay consistent
+      const totalBase = yourRepos.reduce((sum, r) => sum + (r.base_points || 0), 0);
+      const totalBonus = yourRepos.reduce((sum, r) => {
+        const complete = r.cards > 0 && r.collected >= r.cards;
+        return sum + computeCompletionBonus(r.base_points || 0, complete);
+      }, 0);
+      const totalPoints = totalBase + totalBonus;
       if (totalPoints > 0) {
-        const totalBase = yourRepos.reduce((sum, r) => sum + (r.base_points || 0), 0);
-        const totalBonus = yourRepos.reduce((sum, r) => sum + ((r.cards > 0 && r.collected >= r.cards) ? (r.completion_bonus || 0) : 0), 0);
         html += `<div class="score-total">
           <span class="score-total-label">Total</span>
           <span class="score-total-value">${totalBase.toLocaleString()}${totalBonus > 0 ? `<span class="score-total-bonus">+${totalBonus.toLocaleString()}</span>` : ''}<span class="score-total-eq"> = ${totalPoints.toLocaleString()} pts</span></span>
@@ -860,6 +864,24 @@ async function loadStarBalance() {
   } catch { starBalance = 0; }
 }
 
+const RARITY_POINTS = { mythic: 50, legendary: 15, epic: 5, rare: 2, common: 1 };
+const RARITY_ORDER = ['mythic', 'legendary', 'epic', 'rare', 'common'];
+const RARITY_COLORS = { mythic: '#ff0040', legendary: '#ffd700', epic: '#c084fc', rare: '#60a5fa', common: '#888' };
+
+function computeRepoBasePoints(contributors, collectedLogins) {
+  let total = 0;
+  for (const c of contributors) {
+    if (collectedLogins[c.login]) {
+      total += RARITY_POINTS[c.rarity] || 0;
+    }
+  }
+  return total;
+}
+
+function computeCompletionBonus(basePoints, isComplete) {
+  return isComplete ? Math.floor(basePoints * 0.5) : 0;
+}
+
 const REVERT_YIELD = { common: 1, rare: 3, epic: 10, legendary: 30, mythic: 100 };
 const CHERRY_PICK_COST = { common: 5, rare: 15, epic: 50, legendary: 150, mythic: 500 };
 
@@ -902,13 +924,15 @@ async function loadRepo(fromHomepage) {
       await loadStarBalance();
     }
 
-    // Check achievements for logged-in users
+    // Check achievements and refresh DB scores for logged-in users
     lastAchievementData = null;
     if (_currentUser) {
       try {
         const achRes = await fetch(`/api/achievements/${owner}/${repo}`);
         if (achRes.ok) lastAchievementData = await achRes.json();
       } catch { /* silent */ }
+      // Fire-and-forget: trigger score refresh so DB stays in sync with repo cache
+      fetch(`/api/score/${owner}/${repo}`).catch(() => {});
     }
 
     // Capture card param before replaceState strips it
@@ -1077,27 +1101,23 @@ function renderRepoInfo(owner, repo) {
   const ghLink = `<a class="repo-gh-link" href="https://github.com/${owner}/${repo}" target="_blank" rel="noopener">${GH_ICON} View on GitHub</a>`;
 
   // Points breakdown by rarity
-  const rarityPts = { mythic: 50, legendary: 15, epic: 5, rare: 2, common: 1 };
-  const rarityColors = { mythic: '#ff0040', legendary: '#ffd700', epic: '#c084fc', rare: '#60a5fa', common: '#888' };
-  const rarityOrder = ['mythic', 'legendary', 'epic', 'rare', 'common'];
   let breakdownHTML = '';
   if (_currentUser) {
-    let totalBase = 0;
-    const rows = rarityOrder.map(rarity => {
+    const totalBase = computeRepoBasePoints(allContributors, library);
+    const rows = RARITY_ORDER.map(rarity => {
       const allOfRarity = allContributors.filter(c => c.rarity === rarity);
       const collectedOfRarity = allOfRarity.filter(c => library[c.login]);
-      const pts = collectedOfRarity.length * rarityPts[rarity];
-      totalBase += pts;
-      return { rarity, collected: collectedOfRarity.length, total: allOfRarity.length, ptsEach: rarityPts[rarity], pts };
+      const pts = collectedOfRarity.length * RARITY_POINTS[rarity];
+      return { rarity, collected: collectedOfRarity.length, total: allOfRarity.length, ptsEach: RARITY_POINTS[rarity], pts };
     });
-    const completionBonus = isComplete ? Math.floor(totalBase * 0.5) : 0;
+    const completionBonus = computeCompletionBonus(totalBase, isComplete);
     const grandTotal = totalBase + completionBonus;
 
     breakdownHTML = `<div class="points-breakdown">
       <div class="panel-desc">Collect cards to earn points and climb the leaderboard</div>
       <div class="pb-rows">
         ${rows.map(r => `<div class="pb-row">
-          <span class="pb-rarity" style="color:${rarityColors[r.rarity]}">${r.rarity}</span>
+          <span class="pb-rarity" style="color:${RARITY_COLORS[r.rarity]}">${r.rarity}</span>
           <span class="pb-calc">${r.collected}/${r.total} &times; ${r.ptsEach}</span>
           <span class="pb-pts">${r.pts}</span>
         </div>`).join('')}
@@ -1182,10 +1202,8 @@ function renderRepoInfo(owner, repo) {
       }
       const leftCol = _currentUser ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '';
       const pointsTotal = (() => {
-        let tb = 0;
-        rarityOrder.forEach(r => { tb += allContributors.filter(c => c.rarity === r && library[c.login]).length * rarityPts[r]; });
-        const cb = isComplete ? Math.floor(tb * 0.5) : 0;
-        return tb + cb;
+        const tb = computeRepoBasePoints(allContributors, library);
+        return tb + computeCompletionBonus(tb, isComplete);
       })();
       const rightPanels = [
         _currentUser ? `<details class="repo-panel-collapse" id="points-panel"><summary class="repo-panel-toggle">Score <span class="panel-summary">${pointsTotal.toLocaleString()} pts${!isComplete ? ' &middot; 1.5x bonus at completion' : ' &middot; 1.5x bonus active'}</span></summary>${breakdownHTML}</details>` : '',

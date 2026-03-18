@@ -22,7 +22,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${login}'s GitPacks Card`,
       description: `Contributor card for ${owner}/${repo} on GitPacks`,
-      images: [{ url: ogUrl, width: 1200, height: 630 }],
+      images: [{ url: ogUrl, width: 1200, height: 630, type: 'image/png' }],
       url: cardUrl,
     },
     twitter: {

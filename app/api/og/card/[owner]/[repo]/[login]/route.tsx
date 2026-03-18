@@ -83,10 +83,13 @@ export async function GET(
 
   const ogResvg = new Resvg(ogSvg, { fitTo: { mode: 'width', value: 1200 }, font: fontOpts });
   const ogPng = ogResvg.render();
-  return new Response(new Uint8Array(ogPng.asPng()), {
+  const pngBuffer = ogPng.asPng();
+  return new Response(new Uint8Array(pngBuffer), {
     headers: {
       'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+      'Content-Length': pngBuffer.length.toString(),
+      'Cache-Control': 'public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800',
+      'Vary': 'Accept-Encoding',
     },
   });
 }

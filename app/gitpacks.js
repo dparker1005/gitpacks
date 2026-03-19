@@ -1040,9 +1040,12 @@ if (urlRepo && !_currentUser && urlCard) {
   // Logged-out user with shared card link — show lightweight card overlay
   showSharedCardOverlay(urlRepo, urlCard);
   loadPopularRepos();
-} else if (urlRepo && input) {
-  input.value = urlRepo;
-  loadRepo();
+} else if (urlRepo && _currentUser) {
+  // Logged-in user with URL param — load popular repos first (creates input), then load repo
+  loadPopularRepos().then(() => {
+    if (input) input.value = urlRepo;
+    loadRepo(false, urlRepo);
+  });
 } else {
   loadPopularRepos();
 }
@@ -1050,9 +1053,9 @@ if (urlRepo && !_currentUser && urlCard) {
 // Handle browser back/forward between homepage and repo views
 window.addEventListener('popstate', () => {
   const repo = new URLSearchParams(window.location.search).get('repo');
-  if (repo && input && (!repoLoaded || currentRepoName !== repo)) {
-    input.value = repo;
-    loadRepo();
+  if (repo && (!repoLoaded || currentRepoName !== repo)) {
+    if (input) input.value = repo;
+    loadRepo(false, repo);
   } else if (!repo && repoLoaded) {
     newRepo(true);
   }
@@ -1119,8 +1122,8 @@ function computeCompletionBonus(basePoints, isComplete) {
 const REVERT_YIELD = { common: 1, rare: 3, epic: 10, legendary: 30, mythic: 100 };
 const CHERRY_PICK_COST = { common: 5, rare: 15, epic: 50, legendary: 150, mythic: 500 };
 
-async function loadRepo(fromHomepage) {
-  const repoInput = input.value.trim().replace(/^https?:\/\/github\.com\//, '');
+async function loadRepo(fromHomepage, repoOverride) {
+  const repoInput = (repoOverride || (input ? input.value : '')).trim().replace(/^https?:\/\/github\.com\//, '');
   const match = repoInput.match(/^([^/]+)\/([^/]+)/);
   if (!match) return showError('Enter a valid repo like owner/repo');
   const [, owner, repo] = match;
@@ -1128,7 +1131,7 @@ async function loadRepo(fromHomepage) {
   popularRepos.style.display = 'none';
   const landingEl = document.getElementById('landing-section');
   if (landingEl) landingEl.style.display = 'none';
-  loading.style.display = 'block'; btn.disabled = true;
+  loading.style.display = 'block'; if (btn) btn.disabled = true;
   try {
     loading.innerHTML = `<div style="text-align:center;padding:60px 20px">
       <div class="spinner"></div>
@@ -1199,7 +1202,7 @@ async function loadRepo(fromHomepage) {
       if (target) openFullscreenCard(target);
     }
   } catch (err) { console.error('[GHTC] loadRepo error:', err.message, err.stack); showError(err.message); loading.style.display = 'none'; }
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
 }
 
 function renderRepoInfo(owner, repo) {

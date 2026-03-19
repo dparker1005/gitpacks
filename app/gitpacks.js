@@ -530,6 +530,153 @@ async function loadContributedRepos(yourRepos) {
   }
 }
 
+// ===== SHARED CARD OVERLAY (logged-out users) =====
+async function showSharedCardOverlay(repoName, login) {
+  const [owner, repo] = repoName.split('/');
+  if (!owner || !repo || !login) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'shared-card-overlay';
+  overlay.innerHTML = `
+    <button class="shared-card-close" id="shared-card-close">&times;</button>
+    <div class="shared-card-content">
+      <div class="shared-card-header">
+        <div class="shared-card-logo">${GP_ICON}</div>
+        <div class="shared-card-title">GitPacks</div>
+      </div>
+      <div class="shared-card-heading">Open packs. Collect contributors. Complete the set.</div>
+      <div class="shared-card-slot">
+        <div class="reveal-slot unflipped" data-rarity="common" id="shared-card-flip">
+          <div class="rarity-glow"></div>
+          <div class="reveal-card">
+            <div class="reveal-card-back">
+              <div class="reveal-card-back-logo">${GP_ICON}</div>
+              <div class="reveal-card-back-repo"><span class="repo-owner">${owner}</span><span class="repo-name">${repo}</span></div>
+              <div class="reveal-card-back-brand">GitPacks</div>
+            </div>
+            <div class="reveal-card-front" id="shared-card-front"></div>
+          </div>
+        </div>
+      </div>
+      <div class="shared-card-instruction">Click the card to reveal</div>
+      <div class="shared-card-cta" style="display:none" id="shared-card-cta">
+        <button class="login-btn landing-cta" id="shared-card-login">
+          <svg viewBox="0 0 16 16" width="18" height="18" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          Sign In with GitHub
+        </button>
+        <p class="landing-cta-sub">Start with <strong>10 packs</strong> to open</p>
+        <p class="landing-cta-sub landing-cta-sub2">Contribute to a repo? <strong>You get your own card.</strong></p>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  function closeOverlay() {
+    overlay.remove();
+    history.replaceState(null, '', window.location.pathname);
+  }
+  overlay.querySelector('#shared-card-close').addEventListener('click', closeOverlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeOverlay(); });
+  document.addEventListener('keydown', function handler(e) {
+    if (e.code === 'Escape') { closeOverlay(); document.removeEventListener('keydown', handler); }
+  });
+  overlay.querySelector('#shared-card-login').addEventListener('click', () => {
+    if (window.__gpLogin) window.__gpLogin();
+  });
+
+  // Fetch contributor data and prepare the card front
+  try {
+    const res = await fetch(`/api/contributor/${owner}/${repo}/${login}`);
+    if (!res.ok) return;
+    const c = await res.json();
+
+    // Find card index (approximate — we don't have full list, use 1/100)
+    const cardHTML = buildGalleryCard(c, 1, 100);
+    const front = overlay.querySelector('#shared-card-front');
+    if (front) front.innerHTML = `<div class="card-wrapper" data-rarity="${c.rarity}" style="opacity:1">${cardHTML}</div>`;
+
+    // Scale card to fit slot (same approach as self-card reveal)
+    const slot = overlay.querySelector('#shared-card-flip');
+    const cw = front?.querySelector('.card-wrapper');
+    if (cw && slot) {
+      const slotW = slot.offsetWidth || 220;
+      const slotH = slot.offsetHeight || 340;
+      const cardScale = Math.min(slotW / 320, slotH / 480);
+      cw.style.transform = `scale(${cardScale})`;
+    }
+
+    // Update rarity on the slot for glow effects
+    if (slot) {
+      slot.dataset.rarity = c.rarity;
+
+      // Flip on click
+      slot.addEventListener('click', () => {
+        if (!slot.classList.contains('unflipped')) return;
+        slot.classList.remove('unflipped');
+        const card = slot.querySelector('.reveal-card');
+        const rarity = c.rarity;
+        if (card) {
+          card.classList.add('flip-' + rarity);
+          card.style.transition = 'transform 0.6s ease';
+          card.style.transform = 'rotateY(0deg) scale(1)';
+        }
+
+        // Rarity glow
+        const glowDelay = { common:400, rare:600, epic:800, legendary:1000, mythic:1400 }[rarity] || 400;
+        setTimeout(() => {
+          if (rarity !== 'common') slot.classList.add('revealed');
+        }, glowDelay * 0.5);
+
+        // Rarity effects (flash, ring, particles, shake)
+        if (rarity === 'mythic') {
+          overlay.classList.add('shake-screen');
+          setTimeout(() => overlay.classList.remove('shake-screen'), 600);
+          slot.insertAdjacentHTML('beforeend', '<div class="mythic-flash"></div><div class="mythic-ring"></div>');
+          let particles = '<div class="leg-particles">';
+          const colors = ['#ff0040','#ff6600','#fff','#ff00ff'];
+          for (let i = 0; i < 20; i++) {
+            const angle = (Math.PI * 2 / 20) * i;
+            const dist = 80 + Math.random() * 120;
+            const px = Math.cos(angle) * dist;
+            const py = Math.sin(angle) * dist;
+            const col = colors[Math.floor(Math.random() * colors.length)];
+            particles += `<div class="leg-particle" style="width:5px;height:5px;background:${col};--px:${px}px;--py:${py}px;--pdur:${0.8 + Math.random() * 0.6}s;--pdelay:${Math.random() * 0.2}s"></div>`;
+          }
+          particles += '</div>';
+          slot.insertAdjacentHTML('beforeend', particles);
+        } else if (rarity === 'legendary') {
+          overlay.classList.add('shake-screen');
+          setTimeout(() => overlay.classList.remove('shake-screen'), 500);
+          slot.insertAdjacentHTML('beforeend', '<div class="legendary-flash"></div><div class="legendary-ring"></div>');
+          let particles = '<div class="leg-particles">';
+          const colors = ['#ffd700','#ff6ec7','#fff'];
+          for (let i = 0; i < 15; i++) {
+            const angle = (Math.PI * 2 / 15) * i;
+            const dist = 60 + Math.random() * 100;
+            const px = Math.cos(angle) * dist;
+            const py = Math.sin(angle) * dist;
+            const col = colors[Math.floor(Math.random() * colors.length)];
+            particles += `<div class="leg-particle" style="width:4px;height:4px;background:${col};--px:${px}px;--py:${py}px;--pdur:${0.6 + Math.random() * 0.5}s;--pdelay:${Math.random() * 0.2}s"></div>`;
+          }
+          particles += '</div>';
+          slot.insertAdjacentHTML('beforeend', particles);
+        } else if (rarity === 'epic') {
+          slot.insertAdjacentHTML('beforeend', '<div class="epic-flash"></div><div class="epic-ring"></div>');
+        } else if (rarity === 'rare') {
+          slot.insertAdjacentHTML('beforeend', '<div class="rare-flash"></div>');
+        }
+
+        // Show CTA after flip
+        const instruction = overlay.querySelector('.shared-card-instruction');
+        if (instruction) instruction.style.display = 'none';
+        setTimeout(() => {
+          const cta = overlay.querySelector('#shared-card-cta');
+          if (cta) cta.style.display = '';
+        }, glowDelay);
+      });
+    }
+  } catch { /* silent — card back still shows */ }
+}
+
 // ===== LANDING CARD FAN =====
 const LANDING_RARITY_ORDER = ['common', 'legendary', 'mythic', 'epic', 'rare'];
 let _landingActiveRepo = null;
@@ -888,7 +1035,12 @@ loadReferralInfo();
 
 // Auto-load from URL param, otherwise show repo browser
 const urlRepo = new URLSearchParams(window.location.search).get('repo');
-if (urlRepo && input) {
+const urlCard = new URLSearchParams(window.location.search).get('card');
+if (urlRepo && !_currentUser && urlCard) {
+  // Logged-out user with shared card link — show lightweight card overlay
+  showSharedCardOverlay(urlRepo, urlCard);
+  loadPopularRepos();
+} else if (urlRepo && input) {
   input.value = urlRepo;
   loadRepo();
 } else {
@@ -1072,7 +1224,7 @@ function renderRepoInfo(owner, repo) {
   // Sign-in nudge for logged-out users
   let authNudge = '';
   if (!_currentUser) {
-    authNudge = `<div class="auth-nudge"><span class="auth-nudge-icon">&#x1f512;</span> Sign up to save your cards and get <strong>10 free packs</strong></div>`;
+    authNudge = `<div class="auth-nudge"><span class="auth-nudge-icon">&#x1f512;</span> Sign up to save your cards — start with <strong>10 packs</strong></div>`;
   }
 
   // Achievement panel for logged-in users
@@ -1244,7 +1396,7 @@ function renderRepoInfo(owner, repo) {
     ${authNudge}
     <div class="repo-action-row">
       <div class="action-buttons">
-        <button class="btn-secondary" id="open-pack-btn" ${total === 0 ? 'disabled' : ''} ${_currentUser && packState && ((packState.bonusPacks || 0) + packState.readyPacks) <= 0 ? 'disabled' : ''} ${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? '' : ''}>${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'Sign Up for 10 Free Packs' : 'Open Pack'}</button>
+        <button class="btn-secondary" id="open-pack-btn" ${total === 0 ? 'disabled' : ''} ${_currentUser && packState && ((packState.bonusPacks || 0) + packState.readyPacks) <= 0 ? 'disabled' : ''} ${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? '' : ''}>${!_currentUser && localStorage.getItem('gp_guest_limit_reached') ? 'Sign Up — 10 Packs Waiting' : 'Open Pack'}</button>
         ${packHTML}
       </div>
     </div>
@@ -1464,7 +1616,7 @@ async function openPack() {
   overlay.className = 'pack-overlay';
 
   // Sign-in banner for logged-out users — persistent across all pack stages
-  const packAuthBanner = !_currentUser ? `<div class="pack-auth-banner"><span class="pack-auth-banner-icon">&#x1f512;</span> Sign up for 10 free packs <button class="login-btn pack-auth-banner-btn" id="pack-sign-in-btn"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> Sign Up</button></div>` : '';
+  const packAuthBanner = !_currentUser ? `<div class="pack-auth-banner"><span class="pack-auth-banner-icon">&#x1f512;</span> Sign up — start with 10 packs <button class="login-btn pack-auth-banner-btn" id="pack-sign-in-btn"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> Sign Up</button></div>` : '';
 
   const oddsHTML = getPackOddsHTML();
 
@@ -1806,7 +1958,7 @@ function revealCards(overlay, picks, onComplete) {
           if (limitReached || guestPacksRemaining <= 0) {
             hasMorePacks = false;
             // Replace "View Library" with sign-up CTA for guests
-            doneBtn.textContent = 'Sign Up for 10 Free Packs';
+            doneBtn.textContent = 'Sign Up — 10 Packs Waiting';
             doneBtn.className = 'reveal-done-btn reveal-signup-btn';
             doneBtn.onclick = () => { if (window.__gpLogin) window.__gpLogin(); };
           } else {
@@ -2476,7 +2628,7 @@ function openFullscreenCard(c) {
     <div class="fullscreen-bottom">
       ${!_currentUser ? `<div class="fs-sales-pitch">
         <p class="fs-sales-text">Open packs, collect contributors, and climb the leaderboard.</p>
-        <p class="fs-sales-cta"><strong>10 free packs</strong> when you sign up. Contribute to a repo and <strong>get your own card for free</strong>.</p>
+        <p class="fs-sales-cta">Start with <strong>10 packs</strong>. Contribute to a repo and <strong>get your own card</strong>.</p>
         ${localStorage.getItem('gp_ref') ? `<p class="fs-referral-nudge">Plus gain <strong>5 bonus packs</strong> for you and your referrer!</p>` : ''}
         <button class="login-btn fs-sales-btn" id="fs-sign-in"><svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg> Sign In with GitHub</button>
       </div>` : ''}

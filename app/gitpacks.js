@@ -350,64 +350,53 @@ async function loadPopularRepos(featuredRepo) {
         <div class="dailies-grid">${Array(5).fill('<div class="daily-item"><span class="skeleton-pulse" style="display:inline-block;width:100%;height:1.2em;border-radius:4px"></span></div>').join('')}</div>
       </div></div>`;
 
-      // Dashboard layout for logged-in users
+      // Dashboard layout: 4 quadrants
       html += `<div class="dashboard">`;
 
       const hasCollection = inProgressRepos.length || completedRepos.length;
 
-      // Row 1 left: In Progress
+      // Top-left: In Progress
+      html += `<div class="dash-quad dash-q-inprogress">
+        <h3 class="popular-title">${hasCollection ? 'In Progress' : 'Your Collection'}</h3>`;
       if (inProgressRepos.length) {
-        html += `<div class="popular-section dash-inprogress">
-          <h3 class="popular-title">In Progress</h3>
-          <div class="popular-grid dash-scroll">${inProgressRepos.map(r => repoBtnScored(r, true)).join('')}</div>
-        </div>`;
+        html += `<div class="popular-grid dash-scroll">${inProgressRepos.map(r => repoBtnScored(r, true)).join('')}</div>`;
       } else if (!hasCollection) {
-        html += `<div class="popular-section dash-inprogress">
-          <h3 class="popular-title">Your Collection</h3>
-          <p class="popular-hint">Open packs on any repo to start collecting!</p>
-        </div>`;
-      } else {
-        html += `<div class="dash-inprogress"></div>`;
+        html += `<p class="popular-hint">Open packs on any repo to start collecting!</p>`;
       }
+      html += `</div>`;
 
-      // Row 1 right: Leaderboard
-      html += `<div id="leaderboard-section" class="popular-section dash-leaderboard"><h3 class="popular-title">Leaderboard</h3><div class="leaderboard-list dash-scroll">${Array(10).fill('<div class="lb-row lb-skeleton"><span class="lb-rank">&nbsp;</span><div class="lb-avatar skeleton-pulse"></div><span class="lb-info"><span class="lb-name skeleton-pulse" style="display:inline-block;width:80px;height:1em;border-radius:4px"></span></span><span class="lb-points skeleton-pulse" style="display:inline-block;width:40px;height:1em;border-radius:4px"></span></div>').join('')}</div></div>`;
+      // Top-right: Leaderboard (score summary is injected by loadLeaderboard)
+      html += `<div id="leaderboard-section" class="dash-quad dash-q-leaderboard"><h3 class="popular-title">Leaderboard</h3><div class="leaderboard-list dash-scroll">${Array(10).fill('<div class="lb-row lb-skeleton"><span class="lb-rank">&nbsp;</span><div class="lb-avatar skeleton-pulse"></div><span class="lb-info"><span class="lb-name skeleton-pulse" style="display:inline-block;width:80px;height:1em;border-radius:4px"></span></span><span class="lb-points skeleton-pulse" style="display:inline-block;width:40px;height:1em;border-radius:4px"></span></div>').join('')}</div></div>`;
 
-      // Row 2 left: Completed + Score Total
+      // Bottom-left: Completed + Score Total + Your Repos
+      const totalBase = yourRepos.reduce((sum, r) => sum + (r.base_points || 0), 0);
+      const totalBonus = yourRepos.reduce((sum, r) => sum + (r.completion_bonus || 0), 0);
+      const totalPoints = yourRepos.reduce((sum, r) => sum + (r.total_points || 0), 0);
+      html += `<div class="dash-quad dash-q-completed">
+        <h3 class="popular-title">Completed</h3>`;
       if (completedRepos.length) {
-        html += `<div class="popular-section dash-completed">
-          <h3 class="popular-title">Completed</h3>
-          <div class="popular-grid dash-scroll">${completedRepos.map(r => repoBtnScored(r, false)).join('')}</div>
-        </div>`;
-      } else {
-        html += `<div class="dash-completed"></div>`;
+        html += `<div class="popular-grid dash-scroll">${completedRepos.map(r => repoBtnScored(r, false)).join('')}</div>`;
       }
+      if (totalPoints > 0) {
+        html += `<div class="score-total">
+          <span class="score-total-label">Total</span>
+          <span class="score-total-value">${totalBase.toLocaleString()}${totalBonus > 0 ? `<span class="score-total-bonus">+${totalBonus.toLocaleString()}</span>` : ''}<span class="score-total-eq"> = ${totalPoints.toLocaleString()} pts</span></span>
+        </div>`;
+      }
+      html += `<div id="contributed-section" class="contributed-placeholder">
+        <h3 class="popular-title">Your Repos</h3>
+        <div class="popular-grid dash-scroll"><div class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div></div>
+      </div>`;
+      html += `</div>`;
 
-      // Row 2 right: Discover
-      html += `<div class="popular-section dash-discover">
+      // Bottom-right: Discover
+      html += `<div class="dash-quad dash-q-discover">
         <h3 class="popular-title">Discover</h3>
         <div class="discover-search" id="search-container">
           <input type="text" id="repo-input" placeholder="Search any repo..." />
           <button id="generate-btn" class="discover-search-btn">Go</button>
         </div>
         ${otherRepos.length ? `<div class="popular-grid dash-scroll">${otherRepos.map(r => repoBtn(r, false)).join('')}</div>` : ''}
-      </div>`;
-
-      // Score total row (spans full width, outside sections)
-      const totalBase = yourRepos.reduce((sum, r) => sum + (r.base_points || 0), 0);
-      const totalBonus = yourRepos.reduce((sum, r) => sum + (r.completion_bonus || 0), 0);
-      const totalPoints = yourRepos.reduce((sum, r) => sum + (r.total_points || 0), 0);
-      if (totalPoints > 0) {
-        html += `<div class="score-total dash-score-total">
-          <span class="score-total-label">Total</span>
-          <span class="score-total-value">${totalBase.toLocaleString()}${totalBonus > 0 ? `<span class="score-total-bonus">+${totalBonus.toLocaleString()}</span>` : ''}<span class="score-total-eq"> = ${totalPoints.toLocaleString()} pts</span></span>
-        </div>`;
-      }
-
-      // Row 3 left: Your Repos (contributed)
-      html += `<div id="contributed-section" class="popular-section contributed-placeholder dash-repos">
-        <h3 class="popular-title">Your Repos</h3>
-        <div class="popular-grid dash-scroll"><div class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div></div>
       </div>`;
 
       html += `</div>`; // close .dashboard
@@ -501,7 +490,7 @@ async function loadContributedRepos(yourRepos) {
       </button>`;
   }
 
-  section.className = 'popular-section dash-repos';
+  section.className = 'contributed-placeholder';
   section.innerHTML = `
     <h3 class="popular-title">Your Repos</h3>
     <div class="popular-grid dash-scroll">${newContributed.map(contribBtn).join('')}</div>

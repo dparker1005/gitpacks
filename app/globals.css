@@ -71,15 +71,20 @@
 
     /* === DASHBOARD (logged-in homepage) === */
     .dashboard { display:grid; grid-template-columns:1fr 1fr; gap:0 32px; max-width:1100px; margin:0 auto; padding:0 20px; }
-    .dashboard-col { min-width:0; }
-    .dashboard .popular-section { max-width:none; text-align:left; padding:20px 0 30px; }
+    .dash-inprogress { grid-column:1; grid-row:1; }
+    .dash-leaderboard { grid-column:2; grid-row:1; }
+    .dash-completed { grid-column:1; grid-row:2; }
+    .dash-discover { grid-column:2; grid-row:2; }
+    .dash-score-total { grid-column:1 / -1; grid-row:3; }
+    .dash-repos { grid-column:1; grid-row:4; }
+    .dashboard .popular-section { max-width:none; text-align:left; padding:20px 0 30px; min-width:0; }
     .dashboard .popular-title { text-align:left; }
-    .dashboard .popular-grid { max-height:300px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(120,115,245,0.3) transparent; }
-    .dashboard .popular-grid::-webkit-scrollbar { width:4px; }
-    .dashboard .popular-grid::-webkit-scrollbar-thumb { background:rgba(120,115,245,0.3); border-radius:4px; }
-    .dashboard .leaderboard-list { max-height:300px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(120,115,245,0.3) transparent; }
-    .dashboard .leaderboard-list::-webkit-scrollbar { width:4px; }
-    .dashboard .leaderboard-list::-webkit-scrollbar-thumb { background:rgba(120,115,245,0.3); border-radius:4px; }
+    .dashboard .dash-scroll { border:1px solid rgba(120,115,245,0.15); border-radius:10px; padding:6px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:rgba(120,115,245,0.3) transparent; }
+    .dashboard .dash-scroll::-webkit-scrollbar { width:4px; }
+    .dashboard .dash-scroll::-webkit-scrollbar-thumb { background:rgba(120,115,245,0.3); border-radius:4px; }
+    .dash-inprogress .dash-scroll, .dash-leaderboard .dash-scroll { max-height:280px; }
+    .dash-completed .dash-scroll, .dash-discover .dash-scroll { max-height:280px; }
+    .dash-repos .dash-scroll { max-height:280px; }
     .contributed-placeholder { min-height:80px; }
 
     /* === LEADERBOARD === */
@@ -148,6 +153,7 @@
 
     @media (max-width:768px) {
       .dashboard { grid-template-columns:1fr; gap:0; }
+      .dash-inprogress, .dash-leaderboard, .dash-completed, .dash-discover, .dash-score-total, .dash-repos { grid-column:1; grid-row:auto; }
     }
 
     /* === REPO CONTENT LAYOUT === */

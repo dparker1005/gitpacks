@@ -78,8 +78,7 @@
     .dash-quad .dash-scroll::-webkit-scrollbar-thumb { background:rgba(120,115,245,0.3); border-radius:4px; }
     .dash-quad .popular-grid { display:flex; flex-direction:column; gap:8px; }
     .dash-quad .score-total { margin-top:12px; }
-    .dash-quad .contributed-placeholder { margin-top:16px; }
-    .dash-quad .contributed-placeholder .popular-title { margin-bottom:8px; }
+    .contributed-badge { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; color:#7873f5; background:rgba(120,115,245,0.12); border:1px solid rgba(120,115,245,0.25); border-radius:4px; padding:1px 6px; letter-spacing:1px; text-transform:uppercase; flex-shrink:0; }
 
     /* === LEADERBOARD === */
     .score-summary { display:flex; align-items:baseline; gap:12px; padding:16px 20px; margin-bottom:12px; border:1px solid rgba(120,115,245,0.2); border-radius:12px; background:linear-gradient(135deg,rgba(120,115,245,0.06),rgba(74,222,222,0.06)); }

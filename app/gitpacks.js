@@ -383,20 +383,19 @@ async function loadPopularRepos(featuredRepo) {
           <span class="score-total-value">${totalBase.toLocaleString()}${totalBonus > 0 ? `<span class="score-total-bonus">+${totalBonus.toLocaleString()}</span>` : ''}<span class="score-total-eq"> = ${totalPoints.toLocaleString()} pts</span></span>
         </div>`;
       }
-      html += `<div id="contributed-section" class="contributed-placeholder">
-        <h3 class="popular-title">Your Repos</h3>
-        <div class="popular-grid dash-scroll"><div class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div></div>
-      </div>`;
       html += `</div>`;
 
-      // Bottom-right: Discover
+      // Bottom-right: Discover (contributed repos get prepended after async load)
       html += `<div class="dash-quad dash-q-discover">
         <h3 class="popular-title">Discover</h3>
         <div class="discover-search" id="search-container">
           <input type="text" id="repo-input" placeholder="Search any repo..." />
           <button id="generate-btn" class="discover-search-btn">Go</button>
         </div>
-        ${otherRepos.length ? `<div class="popular-grid dash-scroll">${otherRepos.map(r => repoBtn(r, false)).join('')}</div>` : ''}
+        <div id="discover-grid" class="popular-grid dash-scroll">
+          <div id="contributed-loading" class="contrib-loading-row"><span class="spinner-small"></span> Finding your repos...</div>
+          ${otherRepos.map(r => repoBtn(r, false)).join('')}
+        </div>
       </div>`;
 
       html += `</div>`; // close .dashboard
@@ -455,8 +454,9 @@ async function loadPopularRepos(featuredRepo) {
 }
 
 async function loadContributedRepos(yourRepos) {
-  const section = document.getElementById('contributed-section');
-  if (!section) return;
+  const grid = document.getElementById('discover-grid');
+  const loadingEl = document.getElementById('contributed-loading');
+  if (!grid) return;
 
   let contributedRepos = [];
   try {
@@ -464,39 +464,30 @@ async function loadContributedRepos(yourRepos) {
     if (crRes.ok) contributedRepos = await crRes.json();
   } catch { /* silent */ }
 
+  // Remove loading indicator
+  if (loadingEl) loadingEl.remove();
+
   const collectedNames = new Set((yourRepos || []).map(r => r.name.toLowerCase()));
   const newContributed = contributedRepos.filter(r => !collectedNames.has(r.name.toLowerCase()));
 
-  if (newContributed.length === 0) {
-    section.innerHTML = '';
-    return;
-  }
+  if (newContributed.length === 0) return;
 
   function contribBtn(r) {
-    if (r.cached) {
-      return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}">
+    const meta = r.cached
+      ? `<span class="popular-repo-progress">0/${r.cards}</span><span class="popular-repo-pct">0%</span>`
+      : `<span class="contrib-loading"><span class="spinner-small"></span></span>`;
+    return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}"${r.cached ? '' : ' data-preload="true"'}>
+        <span class="contributed-badge">Your repo</span>
         <span class="popular-repo-name">${r.name}</span>
-        <span class="popular-repo-meta">
-          <span class="popular-repo-progress">0/${r.cards}</span>
-          <span class="popular-repo-pct">0%</span>
-        </span>
-      </button>`;
-    }
-    return `<button class="popular-repo-btn contributed-repo-btn" data-repo="${r.name}" data-preload="true">
-        <span class="popular-repo-name">${r.name}</span>
-        <span class="popular-repo-meta">
-          <span class="contrib-loading"><span class="spinner-small"></span></span>
-        </span>
+        <span class="popular-repo-meta">${meta}</span>
       </button>`;
   }
 
-  section.className = 'contributed-placeholder';
-  section.innerHTML = `
-    <h3 class="popular-title">Your Repos</h3>
-    <div class="popular-grid dash-scroll">${newContributed.map(contribBtn).join('')}</div>
-  `;
+  // Prepend contributed repos at top of Discover grid
+  const fragment = document.createRange().createContextualFragment(newContributed.map(contribBtn).join(''));
+  grid.prepend(fragment);
 
-  section.querySelectorAll('.popular-repo-btn').forEach(b => {
+  grid.querySelectorAll('.contributed-repo-btn').forEach(b => {
     b.addEventListener('click', () => quickLoad(b.dataset.repo));
   });
 
@@ -505,12 +496,9 @@ async function loadContributedRepos(yourRepos) {
     const [ow, rp] = r.name.split('/');
     if (!ow || !rp) continue;
     fetch(`/api/repo/${ow}/${rp}`).then(async res => {
-      const btn = section.querySelector(`[data-repo="${r.name}"][data-preload]`);
+      const btn = grid.querySelector(`.contributed-repo-btn[data-repo="${r.name}"][data-preload]`);
       if (!res.ok) {
-        if (btn) {
-          btn.remove();
-          if (!section.querySelector('.popular-repo-btn')) section.innerHTML = '';
-        }
+        if (btn) btn.remove();
         return;
       }
       const data = await res.json();
@@ -521,11 +509,8 @@ async function loadContributedRepos(yourRepos) {
         if (meta) meta.innerHTML = `<span class="popular-repo-progress">0/${cardCount}</span><span class="popular-repo-pct">0%</span>`;
       }
     }).catch(() => {
-      const btn = section.querySelector(`[data-repo="${r.name}"][data-preload]`);
-      if (btn) {
-        btn.remove();
-        if (!section.querySelector('.popular-repo-btn')) section.innerHTML = '';
-      }
+      const btn = grid.querySelector(`.contributed-repo-btn[data-repo="${r.name}"][data-preload]`);
+      if (btn) btn.remove();
     });
   }
 }

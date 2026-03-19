@@ -17,6 +17,17 @@ export async function GET() {
     .eq('owner_repo', '__global__')
     .single();
 
+  // Get global rank (count users with more points)
+  let globalRank = 0;
+  if (globalScore?.total_points) {
+    const { count } = await supabase
+      .from('leaderboard_scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('owner_repo', '__global__')
+      .gt('total_points', globalScore.total_points);
+    globalRank = (count || 0) + 1;
+  }
+
   // Get per-repo stats
   const { data: repoScores } = await supabase
     .from('leaderboard_scores')
@@ -37,6 +48,7 @@ export async function GET() {
 
   return NextResponse.json({
     total_points: globalScore?.total_points || 0,
+    global_rank: globalRank,
     repos_collected: repos.length,
     repos_completed: reposCompleted,
     repos_insured: reposInsured || 0,

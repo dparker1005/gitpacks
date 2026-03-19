@@ -773,7 +773,7 @@ async function loadLeaderboard() {
     // User score summary
     if (userScore && userScore.total_points > 0) {
       html += `<div class="score-summary">
-        <div class="score-summary-points">${userScore.total_points.toLocaleString()}<span class="score-summary-label">pts</span></div>
+        <div class="score-summary-points">${userScore.total_points.toLocaleString()}<span class="score-summary-label">pts</span>${userScore.global_rank ? `<span class="score-summary-rank">#${userScore.global_rank}</span>` : ''}</div>
         <div class="score-summary-stats">
           <span>${userScore.repos_collected} repo${userScore.repos_collected !== 1 ? 's' : ''}</span>
           <span class="score-summary-dot">&middot;</span>

@@ -717,12 +717,16 @@ function selectFeaturedRepo(repoName) {
 }
 
 // ===== LEADERBOARD =====
+let _lbEntries = [];
+let _lbTotal = 0;
+
 async function loadLeaderboard() {
   const section = document.getElementById('leaderboard-section');
   if (!section) return;
 
   try {
-    let entries = cacheGet('leaderboard', 300000)?.entries; // 5 min
+    let cached = cacheGet('leaderboard', 300000); // 5 min
+    let entries = cached?.entries;
     let userScore = _currentUser ? cacheGet('score', 60000) : null; // 1 min
 
     const [lbRes, scoreRes] = await Promise.all([
@@ -733,21 +737,56 @@ async function loadLeaderboard() {
     if (!entries && lbRes && lbRes.ok) {
       const data = await lbRes.json();
       entries = data.entries || [];
+      _lbTotal = data.total_entries || 0;
       cacheSet('leaderboard', data);
+    } else if (cached) {
+      _lbTotal = cached.total_entries || 0;
     }
     entries = entries || [];
+    _lbEntries = entries;
 
     if (!userScore && scoreRes && scoreRes.ok) {
       userScore = await scoreRes.json();
       cacheSet('score', userScore);
     }
 
+    renderLeaderboard(section, entries, userScore);
+  } catch { /* silent */ }
+}
+
+async function loadMoreLeaderboard() {
+  const btn = document.getElementById('lb-load-more');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+
+  try {
+    const res = await fetch(`/api/leaderboard?limit=10&offset=${_lbEntries.length}`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const newEntries = data.entries || [];
+    _lbTotal = data.total_entries || _lbTotal;
+    _lbEntries = _lbEntries.concat(newEntries);
+
+    // Update cache
+    cacheSet('leaderboard', { entries: _lbEntries, total_entries: _lbTotal });
+
+    const section = document.getElementById('leaderboard-section');
+    const userScore = _currentUser ? cacheGet('score', 60000) : null;
+    renderLeaderboard(section, _lbEntries, userScore);
+  } catch {
+    btn.disabled = false;
+    btn.textContent = 'Load more';
+  }
+}
+
+function renderLeaderboard(section, entries, userScore) {
     let html = `<h3 class="popular-title">Leaderboard</h3>`;
 
     // User score summary
     if (userScore && userScore.total_points > 0) {
       html += `<div class="score-summary">
-        <div class="score-summary-points">${userScore.total_points.toLocaleString()}<span class="score-summary-label">pts</span>${userScore.global_rank ? `<span class="score-summary-rank">#${userScore.global_rank}</span>` : ''}</div>
+        <div class="score-summary-points">${userScore.total_points.toLocaleString()}<span class="score-summary-label">pts</span>${userScore.global_rank ? `<span class="score-summary-rank">#${userScore.global_rank}${_lbTotal ? '/' + _lbTotal : ''}</span>` : ''}</div>
         <div class="score-summary-stats">
           <span>${userScore.repos_collected} repo${userScore.repos_collected !== 1 ? 's' : ''}</span>
           <span class="score-summary-dot">&middot;</span>
@@ -774,11 +813,15 @@ async function loadLeaderboard() {
           <span class="lb-points">${e.total_points.toLocaleString()}<span class="lb-pts-label">pts</span></span>
         </a>`;
       });
+
+      if (entries.length < _lbTotal) {
+        html += `<button id="lb-load-more" class="lb-load-more" onclick="loadMoreLeaderboard()">Load more</button>`;
+      }
+
       html += `</div>`;
     }
 
     section.innerHTML = html;
-  } catch { /* silent */ }
 }
 
 // ===== DAILIES =====

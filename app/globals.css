@@ -110,6 +110,9 @@
     .lb-points { font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; color:#4adede; flex-shrink:0; white-space:nowrap; }
     .lb-pts-label { font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; margin-left:3px; color:#4adede; opacity:0.7; }
     .lb-row.lb-you .lb-name { background:linear-gradient(135deg,#7873f5,#4adede); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .lb-load-more { width:100%; padding:8px; margin-top:4px; border:1px solid rgba(120,115,245,0.3); border-radius:10px; background:rgba(20,20,40,0.5); color:#b0b0d0; font-size:0.85rem; cursor:pointer; transition:all 0.2s; }
+    .lb-load-more:hover { background:rgba(120,115,245,0.08); border-color:rgba(120,115,245,0.5); color:#e0e0e0; }
+    .lb-load-more:disabled { opacity:0.5; cursor:default; }
 
     /* Repo button points (stacked layout) */
     .popular-repo-meta-stacked { display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex-shrink:0; }

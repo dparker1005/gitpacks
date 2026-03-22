@@ -1145,8 +1145,8 @@ function renderSprintPanel(sprint) {
 
   // Build lineup display from user's current collection
   const SLOT_LABELS = [
-    { key: 'mythic', label: 'Mythic+', color: '#ff0040' },
-    { key: 'legendary', label: 'Legendary+', color: '#ffd700' },
+    { key: 'mythic', label: 'Mythic', color: '#ff0040' },
+    { key: 'legendary', label: 'Legendary', color: '#ffd700' },
     { key: 'epic', label: 'Epic', color: '#c084fc' },
     { key: 'rare', label: 'Rare', color: '#60a5fa' },
     { key: 'common', label: 'Common', color: '#888' },
@@ -1201,7 +1201,14 @@ function renderSprintPanel(sprint) {
       <span class="sprint-separator">&middot;</span>
       <span class="sprint-repo-participants">${participantsText}</span>
     </div>
-    <div class="sprint-lineup">${lineupHTML}</div>
+    <div class="sprint-lineup">
+      <div class="sprint-lineup-header">
+        <span class="sprint-lh-rarity">Max Rarity</span>
+        <span class="sprint-lh-card">Contributor</span>
+        <span class="sprint-lh-power">Power</span>
+      </div>
+      ${lineupHTML}
+    </div>
     <div class="sprint-lineup-total">
       <span class="sprint-total-label">Total Power</span>
       <span class="sprint-total-value">${lineupPower}</span>
@@ -1213,39 +1220,31 @@ function renderSprintPanel(sprint) {
 
 // Client-side auto-select (mirrors server logic)
 function autoSelectLineupClient() {
-  const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
-  const owned = allContributors.filter(c => library[c.login]).map(c => ({ login: c.login, rarity: c.rarity, power: c.power }));
-  const byRarity = {};
-  for (const c of owned) {
-    if (!byRarity[c.rarity]) byRarity[c.rarity] = [];
-    byRarity[c.rarity].push(c);
-  }
-  for (const r of Object.keys(byRarity)) byRarity[r].sort((a, b) => b.power - a.power);
+  const RARITY_IDX = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
+  // Sort all owned cards by power descending
+  const owned = allContributors
+    .filter(c => library[c.login])
+    .map(c => ({ login: c.login, rarity: c.rarity, power: c.power }))
+    .sort((a, b) => b.power - a.power);
 
   const used = new Set();
   const result = { card_common: null, card_rare: null, card_epic: null, card_legendary: null, card_mythic: null };
 
-  function pickExact(rarity) {
-    for (const c of (byRarity[rarity] || [])) {
-      if (!used.has(c.login)) { used.add(c.login); return c.login; }
+  // Pick highest-power unused card at or below a max rarity index
+  function pickBest(maxIdx) {
+    for (const c of owned) {
+      if (used.has(c.login)) continue;
+      if (RARITY_IDX[c.rarity] <= maxIdx) { used.add(c.login); return c.login; }
     }
     return null;
   }
 
-  function pickAtOrBelow(maxRarity) {
-    const maxIdx = RARITY_ORDER.indexOf(maxRarity);
-    for (let i = maxIdx; i >= 0; i--) {
-      const login = pickExact(RARITY_ORDER[i]);
-      if (login) return login;
-    }
-    return null;
-  }
-
-  result.card_common = pickExact('common');
-  result.card_rare = pickExact('rare');
-  result.card_epic = pickExact('epic');
-  result.card_legendary = pickAtOrBelow('legendary');
-  result.card_mythic = pickAtOrBelow('mythic');
+  // Fill top-down: best card goes to mythic+ slot first
+  result.card_mythic = pickBest(4);     // any rarity
+  result.card_legendary = pickBest(3);  // legendary or lower
+  result.card_epic = pickBest(2);       // epic or lower
+  result.card_rare = pickBest(1);       // rare or lower
+  result.card_common = pickBest(0);     // common only
   return result;
 }
 

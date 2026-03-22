@@ -44,6 +44,8 @@ CREATE POLICY "Users read own sprint entries" ON sprint_entries FOR SELECT USING
 -- Public read for rankings after sprint ends — only expose non-sensitive columns via RPC/views
 -- rank IS NOT NULL means sprint is finalized
 CREATE POLICY "Public read finished sprint rankings" ON sprint_entries FOR SELECT USING (rank IS NOT NULL);
+-- Public read for committed entries (participant counts during active sprints)
+CREATE POLICY "Public count committed sprint entries" ON sprint_entries FOR SELECT USING (committed_at IS NOT NULL);
 -- No direct INSERT/UPDATE policies — all mutations go through SECURITY DEFINER RPCs
 -- to prevent users from setting total_power, rank, packs_won, etc. directly
 
@@ -133,27 +135,27 @@ BEGIN
     v_power := v_power + COALESCE(v_card_power, 0);
   END IF;
 
-  -- Validate rare slot (exact rarity: rare only)
+  -- Validate rare slot (rare or lower)
   IF p_card_rare IS NOT NULL THEN
     IF NOT EXISTS (SELECT 1 FROM user_collections WHERE user_id = p_user_id AND owner_repo = v_owner_repo AND contributor_login = p_card_rare) THEN
       RETURN QUERY SELECT false, NULL::TIMESTAMPTZ, 0; RETURN;
     END IF;
     SELECT (elem->>'power')::INT, elem->>'rarity' INTO v_card_power, v_card_rarity
     FROM jsonb_array_elements(v_repo_data) elem WHERE elem->>'login' = p_card_rare;
-    IF v_card_rarity IS NULL OR v_card_rarity != 'rare' THEN
+    IF v_card_rarity IS NULL OR v_card_rarity NOT IN ('common', 'rare') THEN
       RETURN QUERY SELECT false, NULL::TIMESTAMPTZ, 0; RETURN;
     END IF;
     v_power := v_power + COALESCE(v_card_power, 0);
   END IF;
 
-  -- Validate epic slot (exact rarity: epic only)
+  -- Validate epic slot (epic or lower)
   IF p_card_epic IS NOT NULL THEN
     IF NOT EXISTS (SELECT 1 FROM user_collections WHERE user_id = p_user_id AND owner_repo = v_owner_repo AND contributor_login = p_card_epic) THEN
       RETURN QUERY SELECT false, NULL::TIMESTAMPTZ, 0; RETURN;
     END IF;
     SELECT (elem->>'power')::INT, elem->>'rarity' INTO v_card_power, v_card_rarity
     FROM jsonb_array_elements(v_repo_data) elem WHERE elem->>'login' = p_card_epic;
-    IF v_card_rarity IS NULL OR v_card_rarity != 'epic' THEN
+    IF v_card_rarity IS NULL OR v_card_rarity NOT IN ('common', 'rare', 'epic') THEN
       RETURN QUERY SELECT false, NULL::TIMESTAMPTZ, 0; RETURN;
     END IF;
     v_power := v_power + COALESCE(v_card_power, 0);

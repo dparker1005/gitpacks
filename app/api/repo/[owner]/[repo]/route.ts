@@ -61,12 +61,12 @@ async function fetchAllIssues(
     });
   };
 
-  // Fetch pages in parallel batches of 5, capped at 10 pages (1000 issues)
+  // Fetch pages in parallel batches of 5, up to 50 pages (5000 issues)
   let page = 1;
   let done = false;
-  while (!done && page <= 10) {
+  while (!done && page <= 50) {
     const batch = [];
-    for (let i = 0; i < 5 && page + i <= 10; i++) {
+    for (let i = 0; i < 5 && page + i <= 50; i++) {
       const p = page + i;
       batch.push(
         fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${p}`, { headers })

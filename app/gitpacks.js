@@ -1152,6 +1152,18 @@ function renderSprintPanel(sprint) {
     { key: 'common', label: 'Common', color: '#888' },
   ];
 
+  // Compute theoretical max power (best possible lineup from all cards in repo)
+  const RARITY_IDX = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
+  const allSorted = [...allContributors].sort((a, b) => b.power - a.power);
+  const maxUsed = new Set();
+  let maxPower = 0;
+  for (const maxRarity of [4, 3, 2, 1, 0]) {
+    for (const c of allSorted) {
+      if (maxUsed.has(c.login)) continue;
+      if (RARITY_IDX[c.rarity] <= maxRarity) { maxUsed.add(c.login); maxPower += c.power; break; }
+    }
+  }
+
   let lineupHTML = '';
   let lineupPower = 0;
   const lineup = autoSelectLineupClient();
@@ -1211,7 +1223,7 @@ function renderSprintPanel(sprint) {
     </div>
     <div class="sprint-lineup-total">
       <span class="sprint-total-label">Total Power</span>
-      <span class="sprint-total-value">${lineupPower}</span>
+      <span class="sprint-total-value">${lineupPower} <span class="sprint-total-max">/ ${maxPower} max</span></span>
     </div>
     <button class="sprint-commit-btn" id="sprint-commit-btn" ${canCommit ? '' : 'disabled'} data-sprint-id="${sprint.id}">${commitLabel}</button>
     ${hasEntry ? `<div class="sprint-committed-msg">Committed with ${power} PWR${lineupPower > power ? ` — new lineup has ${lineupPower} PWR` : ''}</div>` : ''}

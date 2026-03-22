@@ -572,8 +572,27 @@ export async function GET(
       );
     }
 
-    // Cache result
-    await setCachedRepo(cacheKey, result);
+    // Capture latest commit SHA and issue number for smart cache invalidation (2 lightweight calls)
+    let commitSha: string | null = null;
+    let issueNumber: number | null = null;
+    try {
+      const ghHeaders = getHeaders();
+      const [commitRes, issueRes] = await Promise.all([
+        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers: ghHeaders }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/issues?per_page=1&state=all&sort=created&direction=desc`, { headers: ghHeaders }),
+      ]);
+      if (commitRes.ok) {
+        const commits = await commitRes.json();
+        if (Array.isArray(commits) && commits.length > 0) commitSha = commits[0].sha;
+      }
+      if (issueRes.ok) {
+        const issues = await issueRes.json();
+        if (Array.isArray(issues) && issues.length > 0) issueNumber = issues[0].number;
+      }
+    } catch { /* non-critical — cache will still work with time-based fallback */ }
+
+    // Cache result with invalidation baseline
+    await setCachedRepo(cacheKey, result, commitSha, issueNumber);
 
     return NextResponse.json(result, {
       headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },

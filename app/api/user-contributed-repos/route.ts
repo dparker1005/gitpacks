@@ -69,30 +69,51 @@ export async function GET() {
       }
     }
 
-    // Fetch details for uncached repos (filter forks, get metadata)
+    // Check which uncached repos already exist in repo_cache (avoid GitHub API calls)
     const uncachedNames = Array.from(repoSet).slice(0, 20);
     if (uncachedNames.length > 0) {
-      const detailed = await Promise.all(
-        uncachedNames.map(async (name) => {
-          try {
-            const res = await fetch(`https://api.github.com/repos/${name}`, { headers });
-            if (!res.ok) return null;
-            return await res.json();
-          } catch {
-            return null;
-          }
-        })
-      );
+      // First check repo_cache for any we already have
+      const { data: cachedUncached } = await anonSupabase
+        .from('repo_cache')
+        .select('owner_repo, card_count')
+        .in('owner_repo', uncachedNames.map(n => n.toLowerCase()));
 
-      for (const r of detailed) {
-        if (!r || r.fork) continue;
+      const cachedUncachedSet = new Set((cachedUncached || []).map((r: any) => r.owner_repo));
+      for (const r of (cachedUncached || [])) {
         results.push({
-          name: r.full_name,
-          description: r.description || '',
-          stars: r.stargazers_count || 0,
-          cards: 0,
-          cached: false,
+          name: r.owner_repo,
+          description: '',
+          stars: 0,
+          cards: r.card_count || 0,
+          cached: true,
         });
+      }
+
+      // Only fetch from GitHub for repos not in cache at all
+      const trulyUncached = uncachedNames.filter(n => !cachedUncachedSet.has(n.toLowerCase()));
+      if (trulyUncached.length > 0) {
+        const detailed = await Promise.all(
+          trulyUncached.map(async (name) => {
+            try {
+              const res = await fetch(`https://api.github.com/repos/${name}`, { headers });
+              if (!res.ok) return null;
+              return await res.json();
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        for (const r of detailed) {
+          if (!r || r.fork) continue;
+          results.push({
+            name: r.full_name,
+            description: r.description || '',
+            stars: r.stargazers_count || 0,
+            cards: 0,
+            cached: false,
+          });
+        }
       }
     }
 

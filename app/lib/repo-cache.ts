@@ -17,17 +17,15 @@ function getGitHubHeaders(): Record<string, string> {
 
 /**
  * Check if a repo has changed by comparing latest commit SHA and latest issue number.
- * Returns true if the repo has changed (or we can't tell), false if unchanged.
  * Costs 2 API calls instead of 10+ for a full refresh.
  */
 async function hasRepoChanged(
   ownerRepo: string,
   cachedCommitSha: string | null,
   cachedIssueNumber: number | null
-): Promise<{ changed: boolean; commitSha: string | null; issueNumber: number | null }> {
-  // If we have no baseline, assume changed
+): Promise<{ changed: boolean }> {
   if (!cachedCommitSha && !cachedIssueNumber) {
-    return { changed: true, commitSha: null, issueNumber: null };
+    return { changed: true };
   }
 
   const headers = getGitHubHeaders();
@@ -54,12 +52,10 @@ async function hasRepoChanged(
       }
     }
   } catch {
-    // API error — assume changed to be safe
-    return { changed: true, commitSha: null, issueNumber: null };
+    return { changed: true };
   }
 
-  const changed = commitSha !== cachedCommitSha || issueNumber !== cachedIssueNumber;
-  return { changed, commitSha, issueNumber };
+  return { changed: commitSha !== cachedCommitSha || issueNumber !== cachedIssueNumber };
 }
 
 export async function getCachedRepo(ownerRepo: string): Promise<any | null> {
@@ -80,14 +76,13 @@ export async function getCachedRepo(ownerRepo: string): Promise<any | null> {
   if (age < CACHE_TTL) return data.data;
 
   // Between 72h and 7d — smart check: see if repo actually changed (2 API calls)
-  const { changed, commitSha, issueNumber } = await hasRepoChanged(
+  const { changed } = await hasRepoChanged(
     ownerRepo,
     data.last_commit_sha,
     data.last_issue_number
   );
 
   if (!changed) {
-    // Repo unchanged — update fetched_at to extend cache, return cached data
     await supabase
       .from('repo_cache')
       .update({ fetched_at: new Date().toISOString() })
@@ -95,11 +90,15 @@ export async function getCachedRepo(ownerRepo: string): Promise<any | null> {
     return data.data;
   }
 
-  // Repo changed — return null to trigger full refresh
   return null;
 }
 
-export async function setCachedRepo(ownerRepo: string, repoData: any, commitSha?: string | null, issueNumber?: number | null): Promise<void> {
+export async function setCachedRepo(
+  ownerRepo: string,
+  repoData: any,
+  commitSha?: string | null,
+  issueNumber?: number | null,
+): Promise<void> {
   const contributorLogins = Array.isArray(repoData)
     ? repoData.map((c: any) => c.login?.toLowerCase()).filter(Boolean)
     : [];

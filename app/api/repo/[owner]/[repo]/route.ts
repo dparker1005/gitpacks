@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedRepo, setCachedRepo } from '@/app/lib/repo-cache';
+import { getCachedRepo, setCachedRepo, getCachedIssueStats } from '@/app/lib/repo-cache';
 import { MIN_REPO_CONTRIBUTORS } from '@/app/lib/constants';
 
 // ===== Helpers =====
@@ -41,18 +41,30 @@ async function fetchWithRetry(url: string): Promise<any> {
 async function fetchAllIssues(
   owner: string,
   repo: string,
+  baseStats?: Record<string, { prsMerged: number; issues: number; avatar: string }>,
+  sinceNumber?: number,
 ): Promise<Record<string, { prsMerged: number; issues: number; avatar: string }>> {
   const headers = getHeaders();
-  const stats: Record<string, { prsMerged: number; issues: number; avatar: string }> = {};
+  // Start with existing stats if doing incremental fetch
+  const stats: Record<string, { prsMerged: number; issues: number; avatar: string }> = baseStats
+    ? JSON.parse(JSON.stringify(baseStats))
+    : {};
 
   const ensure = (login: string, avatar: string) => {
     if (!stats[login]) stats[login] = { prsMerged: 0, issues: 0, avatar: avatar || '' };
     else if (avatar && !stats[login].avatar) stats[login].avatar = avatar;
   };
 
+  let hitOldIssue = false;
+
   const processPage = (data: any[]) => {
     data.forEach((item: any) => {
       if (!item.user || !item.user.login) return;
+      // Incremental: stop counting when we hit issues we've already seen
+      if (sinceNumber && item.number <= sinceNumber) {
+        hitOldIssue = true;
+        return;
+      }
       const login = item.user.login;
       ensure(login, item.user.avatar_url);
       if (item.pull_request) {
@@ -63,15 +75,18 @@ async function fetchAllIssues(
     });
   };
 
+  // Fetch newest first so we can stop early for incremental fetches
+  const sortParam = sinceNumber ? '&sort=created&direction=desc' : '';
+
   // Fetch pages in parallel batches of 5
   let page = 1;
   let done = false;
-  while (!done && page <= 50) {
+  while (!done && page <= 10) {
     const batch = [];
     for (let i = 0; i < 5 && page + i <= 50; i++) {
       const p = page + i;
       batch.push(
-        fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${p}`, { headers })
+        fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${p}${sortParam}`, { headers })
           .then(async (res) => {
             if (res.status === 403 || res.status === 429) return { page: p, data: null, rateLimited: true };
             if (!res.ok) return { page: p, data: null, rateLimited: false };
@@ -88,6 +103,8 @@ async function fetchAllIssues(
       }
       if (!r.data || !r.data.length) { done = true; break; }
       processPage(r.data);
+      // Incremental: stop paging once we've hit old issues
+      if (hitOldIssue) { done = true; break; }
     }
     page += 5;
   }
@@ -543,10 +560,16 @@ export async function GET(
   }
 
   try {
+    // Check for cached issue stats to enable incremental fetch
+    const cachedIssueData = await getCachedIssueStats(cacheKey);
+
     // Fetch all three data sources in parallel
+    // If we have cached issue stats, do incremental issue fetch (only new issues)
     const [statsData, issueStats, extraContributors] = await Promise.all([
       fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/stats/contributors`),
-      fetchAllIssues(owner, repo),
+      cachedIssueData
+        ? fetchAllIssues(owner, repo, cachedIssueData.issueStats, cachedIssueData.lastIssueNumber)
+        : fetchAllIssues(owner, repo),
       fetchPaginatedContributors(owner, repo),
     ]);
 
@@ -591,8 +614,8 @@ export async function GET(
       }
     } catch { /* non-critical — cache will still work with time-based fallback */ }
 
-    // Cache result with invalidation baseline
-    await setCachedRepo(cacheKey, result, commitSha, issueNumber);
+    // Cache result with invalidation baseline and issue stats for incremental fetching
+    await setCachedRepo(cacheKey, result, commitSha, issueNumber, issueStats);
 
     return NextResponse.json(result, {
       headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },

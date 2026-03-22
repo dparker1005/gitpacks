@@ -1210,3 +1210,131 @@
     .stars-trade-btn:hover { background:rgba(120,115,245,0.18); border-color:rgba(120,115,245,0.5); }
     .stars-trade-btn:disabled { opacity:0.5; cursor:default; }
     .repo-stars-hint { display:block; font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#4adede; opacity:0.8; margin-top:4px; }
+
+    /* ===== BETA TAG ===== */
+    .beta-tag { font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#ff6ec7; background:rgba(255,110,199,0.15); border:1px solid rgba(255,110,199,0.35); border-radius:4px; padding:1px 5px; vertical-align:middle; position:relative; top:-1px; }
+
+    /* ===== ENGAGEMENT ROW (Dailies + Sprints side-by-side) ===== */
+    .engagement-row { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:1100px; margin:0 auto; padding:0 20px; }
+    .engagement-row #dailies-section { max-width:none; padding:0; }
+
+    @media (max-width:768px) {
+      .engagement-row { grid-template-columns:1fr; gap:12px; }
+    }
+
+    /* ===== SPRINTS SECTION (Dashboard) ===== */
+    #sprints-section { }
+    .sprints-section { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:12px; padding:14px 18px 12px; margin-bottom:20px; }
+    .sprints-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .sprints-title { font-family:'Orbitron',sans-serif; font-size:0.85rem; font-weight:700; color:#e0e0e0; display:flex; align-items:center; gap:6px; }
+    .sprints-title svg { width:16px; height:16px; }
+    .sprint-past-btn { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#7873f5; background:none; border:1px solid rgba(120,115,245,0.3); border-radius:5px; padding:1px 8px; cursor:pointer; transition:all 0.2s; margin-left:auto; }
+    .sprint-past-btn:hover { background:rgba(120,115,245,0.1); border-color:#7873f5; }
+    .sprint-unclaimed-badge { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; color:#4ade80; background:rgba(74,222,128,0.15); border:1px solid rgba(74,222,128,0.35); border-radius:4px; padding:2px 6px; cursor:pointer; animation:pulse-glow 2s ease-in-out infinite; }
+    @keyframes pulse-glow { 0%,100% { box-shadow:0 0 4px rgba(74,222,128,0.2); } 50% { box-shadow:0 0 10px rgba(74,222,128,0.4); } }
+
+    .sprints-cards { display:flex; gap:10px; }
+    .sprint-card { flex:1; background:rgba(15,15,35,0.6); border:1px solid rgba(120,115,245,0.15); border-radius:10px; padding:10px 14px; }
+    .sprint-card-empty { opacity:0.5; }
+    .sprint-card-label { font-family:'Orbitron',sans-serif; font-size:0.6rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#999; margin-bottom:6px; }
+    .sprint-card-none { font-family:'Rajdhani',sans-serif; font-size:0.8rem; color:#666; }
+    .sprint-card-repo { font-family:'Rajdhani',sans-serif; font-size:0.88rem; font-weight:600; color:#7873f5; background:none; border:none; padding:0; cursor:pointer; text-align:left; transition:color 0.2s; text-decoration:underline; text-decoration-color:rgba(120,115,245,0.3); }
+    .sprint-card-repo:hover { color:#4adede; }
+    .sprint-card-details { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:4px; font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#aaa; }
+    .sprint-committed { color:#4ade80; font-weight:700; }
+    .sprint-not-entered { color:#ff6ec7; }
+    .sprint-separator { color:#555; }
+    .sprint-participants { color:#aaa; }
+    .sprint-timer { color:#bbb; }
+
+    .sprint-card-skeleton { flex:1; }
+
+    @media (max-width:600px) {
+      .sprints-cards { flex-direction:column; }
+    }
+
+    /* ===== SPRINT REPO PANEL (in repo view) ===== */
+    .sprint-repo-panel { padding:12px 0; }
+    .sprint-repo-header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+    .sprint-type-badge { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
+    .sprint-type-badge.daily { color:#4adede; background:rgba(74,222,222,0.15); border:1px solid rgba(74,222,222,0.3); }
+    .sprint-type-badge.weekly { color:#ff6ec7; background:rgba(255,110,199,0.15); border:1px solid rgba(255,110,199,0.3); }
+    .sprint-repo-timer { font-family:'Rajdhani',sans-serif; font-size:0.78rem; color:#bbb; }
+    .sprint-repo-participants { font-family:'Rajdhani',sans-serif; font-size:0.78rem; color:#aaa; margin-left:auto; }
+
+    .sprint-lineup { display:flex; flex-direction:column; gap:4px; }
+    .sprint-lineup-slot { display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:6px; }
+    .sprint-lineup-slot.sprint-slot-empty { opacity:0.4; }
+    .sprint-slot-label { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; width:80px; flex-shrink:0; }
+    .sprint-slot-card { font-family:'Rajdhani',sans-serif; font-size:0.85rem; font-weight:600; color:#e0e0e0; flex:1; }
+    .sprint-slot-none { color:#666; font-style:italic; }
+    .sprint-slot-power { font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; color:#4adede; flex-shrink:0; }
+
+    .sprint-lineup-total { display:flex; justify-content:space-between; align-items:center; margin-top:8px; padding:8px 12px; border-radius:8px; border:1px solid rgba(74,222,222,0.2); background:linear-gradient(135deg,rgba(120,115,245,0.06),rgba(74,222,222,0.06)); }
+    .sprint-total-label { font-family:'Orbitron',sans-serif; font-size:0.6rem; font-weight:700; color:#888; letter-spacing:2px; text-transform:uppercase; }
+    .sprint-total-value { font-family:'Orbitron',sans-serif; font-size:1rem; font-weight:900; background:linear-gradient(135deg,#7873f5,#4adede); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+    .sprint-commit-btn { display:block; width:100%; padding:10px 16px; margin-top:10px; border:none; border-radius:8px; background:linear-gradient(135deg,#7873f5,#4adede); color:#fff; font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; }
+    .sprint-commit-btn:hover { transform:translateY(-1px); box-shadow:0 4px 16px rgba(120,115,245,0.4); }
+    .sprint-commit-btn:disabled { opacity:0.4; cursor:default; transform:none; box-shadow:none; }
+
+    .sprint-committed-msg { font-family:'Rajdhani',sans-serif; font-size:0.78rem; color:#4ade80; text-align:center; margin-top:6px; }
+
+    .sprint-rewards-table { margin-top:12px; border:1px solid rgba(255,255,255,0.06); border-radius:8px; padding:10px 12px; }
+    .sprint-rewards-title { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#999; margin-bottom:6px; }
+    .sprint-reward-row { display:flex; justify-content:space-between; padding:3px 0; font-family:'Rajdhani',sans-serif; font-size:0.78rem; }
+    .sprint-reward-bracket { color:#bbb; }
+    .sprint-reward-packs { color:#4adede; font-weight:700; }
+
+    .sprint-ach-locked { color:#ff6ec7; font-size:0.65rem; }
+
+    /* ===== SPRINT OVERLAYS (Past Sprints + Rankings) ===== */
+    .sprint-overlay { position:fixed; inset:0; z-index:9500; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.85); backdrop-filter:blur(12px); animation:fadeIn 0.3s ease; overflow-y:auto; padding:20px; }
+    .sprint-overlay-content { background:#0d0d20; border:1px solid rgba(120,115,245,0.2); border-radius:14px; padding:24px; max-width:600px; width:100%; max-height:80vh; overflow-y:auto; position:relative; scrollbar-width:thin; scrollbar-color:rgba(120,115,245,0.3) transparent; }
+    .sprint-overlay-content::-webkit-scrollbar { width:4px; }
+    .sprint-overlay-content::-webkit-scrollbar-thumb { background:rgba(120,115,245,0.3); border-radius:4px; }
+    .sprint-overlay-close { position:absolute; top:12px; right:16px; background:none; border:none; color:#999; font-size:1.5rem; cursor:pointer; transition:color 0.2s; z-index:1; }
+    .sprint-overlay-close:hover { color:#fff; }
+    .sprint-overlay-title { font-family:'Orbitron',sans-serif; font-size:1rem; font-weight:700; color:#e0e0e0; margin-bottom:16px; }
+
+    .sprint-past-loading { font-family:'Rajdhani',sans-serif; font-size:0.85rem; color:#888; text-align:center; padding:20px; }
+    .sprint-past-empty { font-family:'Rajdhani',sans-serif; font-size:0.85rem; color:#888; text-align:center; padding:20px; }
+
+    .sprint-past-entry { border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:12px; margin-bottom:8px; background:rgba(255,255,255,0.02); }
+    .sprint-past-main { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+    .sprint-past-info { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .sprint-past-type { font-family:'Orbitron',sans-serif; font-size:0.5rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:2px 6px; border-radius:3px; }
+    .sprint-past-type.daily { color:#4adede; background:rgba(74,222,222,0.15); border:1px solid rgba(74,222,222,0.3); }
+    .sprint-past-type.weekly { color:#ff6ec7; background:rgba(255,110,199,0.15); border:1px solid rgba(255,110,199,0.3); }
+    .sprint-past-repo { font-family:'Rajdhani',sans-serif; font-size:0.85rem; font-weight:600; color:#e0e0e0; }
+    .sprint-past-date { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#888; }
+    .sprint-past-result { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .sprint-past-power { font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:700; color:#4adede; }
+    .sprint-past-rank { font-family:'Orbitron',sans-serif; font-size:0.65rem; color:#bbb; }
+    .sprint-past-bracket { font-family:'Rajdhani',sans-serif; font-size:0.75rem; font-weight:700; color:#7873f5; }
+    .sprint-past-packs { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#4ade80; }
+
+    .sprint-past-actions { display:flex; align-items:center; gap:8px; margin-top:8px; }
+    .sprint-claim-btn { font-family:'Rajdhani',sans-serif; font-size:0.75rem; font-weight:700; color:#fff; background:linear-gradient(135deg,#4ade80,#22d3ee); border:none; border-radius:6px; padding:5px 12px; cursor:pointer; transition:all 0.2s; }
+    .sprint-claim-btn:hover { transform:scale(1.05); box-shadow:0 0 10px rgba(74,222,128,0.4); }
+    .sprint-claim-btn:disabled { opacity:0.6; cursor:default; transform:none; }
+    .sprint-claimed-check { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#4ade80; font-weight:600; }
+    .sprint-rankings-btn { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#7873f5; background:none; border:1px solid rgba(120,115,245,0.3); border-radius:5px; padding:3px 8px; cursor:pointer; transition:all 0.2s; }
+    .sprint-rankings-btn:hover { background:rgba(120,115,245,0.1); border-color:#7873f5; }
+
+    /* ===== SPRINT RANKINGS ===== */
+    .sprint-rankings-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+    .sprint-rankings-repo { font-family:'Rajdhani',sans-serif; font-size:0.9rem; font-weight:600; color:#e0e0e0; }
+    .sprint-rankings-count { font-family:'Rajdhani',sans-serif; font-size:0.75rem; color:#888; margin-left:auto; }
+
+    .sprint-rank-row { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; background:rgba(20,20,40,0.5); border:1px solid transparent; margin-bottom:3px; transition:all 0.2s; }
+    .sprint-rank-row:hover { border-color:rgba(120,115,245,0.2); }
+    .sprint-rank-row.sprint-rank-you { border-color:rgba(120,115,245,0.3); background:rgba(120,115,245,0.1); }
+    .sprint-rank-num { font-family:'Orbitron',sans-serif; font-size:0.7rem; font-weight:700; color:#999; width:36px; flex-shrink:0; }
+    .sprint-rank-avatar { width:28px; height:28px; border-radius:50%; flex-shrink:0; border:2px solid rgba(120,115,245,0.2); }
+    .sprint-rank-name { font-family:'Rajdhani',sans-serif; font-size:0.88rem; font-weight:600; color:#e0e0e0; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sprint-rank-name-you { background:linear-gradient(135deg,#7873f5,#4adede); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .sprint-rank-power { font-family:'Orbitron',sans-serif; font-size:0.65rem; font-weight:700; color:#4adede; flex-shrink:0; }
+    .sprint-rank-bracket { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#999; flex-shrink:0; }
+    .sprint-rank-packs { font-family:'Rajdhani',sans-serif; font-size:0.72rem; color:#4ade80; flex-shrink:0; display:flex; align-items:center; gap:2px; }
+    .sprint-rank-packs svg { width:12px; height:12px; }

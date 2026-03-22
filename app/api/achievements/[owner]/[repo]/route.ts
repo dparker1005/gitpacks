@@ -1,10 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedRepo } from '@/app/lib/repo-cache';
+import { getCachedRepo, supabase as publicSupabase } from '@/app/lib/repo-cache';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
 import { getOrCreateProfile } from '@/app/lib/profile';
 import { selectPackCards, Contributor } from '@/app/lib/pack-cards';
 import { addCards } from '@/app/lib/collection';
 import { refreshUserScores } from '@/app/lib/scoring';
+
+async function isSprintRepo(ownerRepo: string): Promise<boolean> {
+  const now = new Date().toISOString();
+  const [repoOwner, repoName] = ownerRepo.split('/');
+  const { data } = await publicSupabase
+    .from('sprints')
+    .select('id')
+    .eq('repo_owner', repoOwner)
+    .eq('repo_name', repoName)
+    .lte('starts_at', now)
+    .gt('ends_at', now)
+    .limit(1);
+  return !!(data && data.length > 0);
+}
 
 const MILESTONE_DEFS: Record<string, { fixed: number[]; increment: number; breakpoint?: number; increment2?: number; statKey: string }> = {
   commits:      { fixed: [1, 10, 50, 100, 500],       increment: 0,   statKey: 'commits' },
@@ -178,6 +192,12 @@ export async function POST(
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    // Block achievement claims on active sprint repos
+    const ownerRepoCheck = `${owner}/${repo}`.toLowerCase();
+    if (await isSprintRepo(ownerRepoCheck)) {
+      return NextResponse.json({ error: 'Achievements are disabled for sprint repos to keep competition fair' }, { status: 403 });
     }
 
     let body: any;

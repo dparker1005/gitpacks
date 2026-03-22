@@ -343,12 +343,23 @@ async function loadPopularRepos(featuredRepo) {
     let html = '';
 
     if (_currentUser) {
-      // Dailies section (above dashboard, only for logged-in users)
+      // Engagement row: Dailies + Sprints side-by-side (above dashboard)
+      html += `<div class="engagement-row">`;
+
+      // Dailies section
       html += `<div id="dailies-section"><div class="dailies-section dailies-skeleton">
         <div class="dailies-header"><div class="dailies-title-row"><span class="skeleton-pulse" style="display:inline-block;width:120px;height:1em;border-radius:4px"></span><span class="daily-progress" style="margin-left:auto"><span class="skeleton-pulse" style="display:inline-block;width:60px;height:1em;border-radius:4px"></span></span></div></div>
         <div class="skeleton-pulse" style="width:70%;height:0.8em;border-radius:4px;margin:0 auto 8px"></div>
         <div class="dailies-grid">${Array(5).fill('<div class="daily-item"><span class="skeleton-pulse" style="display:inline-block;width:100%;height:1.2em;border-radius:4px"></span></div>').join('')}</div>
       </div></div>`;
+
+      // Sprints section (skeleton)
+      html += `<div id="sprints-section"><div class="sprints-section sprints-skeleton">
+        <div class="sprints-header"><span class="skeleton-pulse" style="display:inline-block;width:140px;height:1em;border-radius:4px"></span></div>
+        <div class="sprints-cards"><div class="sprint-card-skeleton"><span class="skeleton-pulse" style="display:inline-block;width:100%;height:4em;border-radius:8px"></span></div><div class="sprint-card-skeleton"><span class="skeleton-pulse" style="display:inline-block;width:100%;height:4em;border-radius:8px"></span></div></div>
+      </div></div>`;
+
+      html += `</div>`; // .engagement-row
 
       // Dashboard layout: 4 quadrants
       html += `<div class="dashboard">`;
@@ -444,11 +455,12 @@ async function loadPopularRepos(featuredRepo) {
       if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') loadRepo(); });
     }
 
-    // Lazy load contributed repos, leaderboard, dailies, and stats
+    // Lazy load contributed repos, leaderboard, dailies, sprints, and stats
     if (_currentUser) {
       loadLeaderboard();
       loadContributedRepos(yourRepos);
       loadDailies();
+      loadSprints();
     }
   } catch { /* silent */ }
 }
@@ -986,6 +998,525 @@ async function refreshDailies() {
   if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
 }
 
+// ===== SPRINTS (Daily + Weekly) =====
+let _sprintData = null; // { daily, weekly, unclaimedCount }
+let _sprintCountdownInterval = null;
+
+async function loadSprints() {
+  const section = document.getElementById('sprints-section');
+  if (!section || !_currentUser) return;
+
+  try {
+    const res = await fetch('/api/sprints/current');
+    if (!res.ok) { section.innerHTML = ''; return; }
+    _sprintData = await res.json();
+    renderSprints(section, _sprintData);
+  } catch { section.innerHTML = ''; }
+}
+
+function renderSprints(section, data) {
+  const { daily, weekly, unclaimedCount = 0 } = data;
+
+  function sprintCardHTML(sprint, label) {
+    if (!sprint) {
+      return `<div class="sprint-card sprint-card-empty">
+        <div class="sprint-card-label">${label}</div>
+        <div class="sprint-card-none">No active sprint</div>
+      </div>`;
+    }
+
+    const repoName = `${sprint.repoOwner}/${sprint.repoName}`;
+    const hasEntry = sprint.myEntry && sprint.myEntry.committedAt;
+    const power = hasEntry ? sprint.myEntry.totalPower : 0;
+    const statusText = hasEntry ? `${power} PWR` : 'Not entered';
+    const statusClass = hasEntry ? 'sprint-committed' : 'sprint-not-entered';
+    const endsAt = new Date(sprint.endsAt).getTime();
+    const remaining = endsAt - Date.now();
+    const timeText = remaining > 0 ? formatSprintTime(remaining) : 'Ending...';
+
+    return `<div class="sprint-card">
+      <div class="sprint-card-label">${label}</div>
+      <button class="sprint-card-repo" data-sprint-repo="${repoName}">${repoName}</button>
+      <div class="sprint-card-details">
+        <span class="${statusClass}">${statusText}</span>
+        <span class="sprint-separator">&middot;</span>
+        <span class="sprint-participants">${sprint.participants} entered</span>
+        <span class="sprint-separator">&middot;</span>
+        <span class="sprint-timer" data-sprint-ends="${sprint.endsAt}">${timeText}</span>
+      </div>
+    </div>`;
+  }
+
+  const unclaimedBadge = unclaimedCount > 0
+    ? `<span class="sprint-unclaimed-badge">${unclaimedCount} unclaimed</span>`
+    : '';
+
+  section.innerHTML = `<div class="sprints-section">
+    <div class="sprints-header">
+      <span class="sprints-title">${GP_ICON} Sprints <span class="beta-tag">BETA</span></span>
+      ${unclaimedBadge}
+      <button class="sprint-past-btn" id="sprint-past-btn">Past Sprints</button>
+    </div>
+    <div class="sprints-cards">
+      ${sprintCardHTML(daily, 'Daily Sprint')}
+      ${sprintCardHTML(weekly, 'Weekly Sprint')}
+    </div>
+  </div>`;
+
+  // Wire repo links
+  section.querySelectorAll('[data-sprint-repo]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const repoName = btn.dataset.sprintRepo;
+      const [o, r] = repoName.split('/');
+      if (o && r) { input.value = repoName; loadRepo(o, r); }
+    });
+  });
+
+  // Wire past sprints button
+  const pastBtn = document.getElementById('sprint-past-btn');
+  if (pastBtn) pastBtn.addEventListener('click', showPastSprintsOverlay);
+
+  // Wire unclaimed badge
+  const unclaimedEl = section.querySelector('.sprint-unclaimed-badge');
+  if (unclaimedEl) unclaimedEl.addEventListener('click', showPastSprintsOverlay);
+
+  // Start countdown
+  startSprintCountdown();
+}
+
+function formatSprintTime(ms) {
+  if (ms <= 0) return 'Ended';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h`;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+function startSprintCountdown() {
+  if (_sprintCountdownInterval) clearInterval(_sprintCountdownInterval);
+
+  function update() {
+    document.querySelectorAll('.sprint-timer[data-sprint-ends]').forEach(el => {
+      const ends = new Date(el.dataset.sprintEnds).getTime();
+      const remaining = ends - Date.now();
+      if (remaining <= 0) {
+        el.textContent = 'Ended';
+        clearInterval(_sprintCountdownInterval);
+        setTimeout(() => loadSprints(), 2000);
+      } else {
+        el.textContent = formatSprintTime(remaining);
+      }
+    });
+  }
+
+  update();
+  _sprintCountdownInterval = setInterval(update, 60000);
+}
+
+// Check if a repo is an active sprint repo
+function getActiveSprintForRepo(ownerRepo) {
+  if (!_sprintData) return null;
+  const lower = ownerRepo.toLowerCase();
+  for (const s of [_sprintData.daily, _sprintData.weekly]) {
+    if (s && `${s.repoOwner}/${s.repoName}`.toLowerCase() === lower) return s;
+  }
+  return null;
+}
+
+// Sprint section in repo view
+function renderSprintPanel(sprint) {
+  const hasEntry = sprint.myEntry && sprint.myEntry.committedAt;
+  const power = hasEntry ? sprint.myEntry.totalPower : 0;
+  const isDaily = sprint.type === 'daily';
+  const typeLabel = isDaily ? 'Daily Sprint' : 'Weekly Sprint';
+
+  const BRACKETS = isDaily
+    ? [['Top 10%', 4], ['Top 25%', 3], ['Top 50%', 2], ['Participated', 1]]
+    : [['Top 10%', 12], ['Top 25%', 9], ['Top 50%', 6], ['Participated', 3]];
+
+  // Build lineup display from user's current collection
+  const SLOT_LABELS = [
+    { key: 'mythic', label: 'Mythic+', color: '#ff0040' },
+    { key: 'legendary', label: 'Legendary+', color: '#ffd700' },
+    { key: 'epic', label: 'Epic', color: '#c084fc' },
+    { key: 'rare', label: 'Rare', color: '#60a5fa' },
+    { key: 'common', label: 'Common', color: '#888' },
+  ];
+
+  let lineupHTML = '';
+  let lineupPower = 0;
+  const lineup = autoSelectLineupClient();
+
+  for (const slot of SLOT_LABELS) {
+    const cardLogin = lineup[`card_${slot.key}`];
+    const card = cardLogin ? allContributors.find(c => c.login === cardLogin) : null;
+    if (card) {
+      lineupPower += card.power;
+      lineupHTML += `<div class="sprint-lineup-slot">
+        <span class="sprint-slot-label" style="color:${slot.color}">${slot.label}</span>
+        <span class="sprint-slot-card">${card.login}</span>
+        <span class="sprint-slot-power">${card.power} PWR</span>
+      </div>`;
+    } else {
+      lineupHTML += `<div class="sprint-lineup-slot sprint-slot-empty">
+        <span class="sprint-slot-label" style="color:${slot.color}">${slot.label}</span>
+        <span class="sprint-slot-card sprint-slot-none">No card</span>
+        <span class="sprint-slot-power">—</span>
+      </div>`;
+    }
+  }
+
+  const commitLabel = hasEntry ? 'Update Lineup' : 'Commit Lineup';
+  const canCommit = lineupPower > 0;
+  const endsAt = new Date(sprint.endsAt).getTime();
+  const remaining = endsAt - Date.now();
+  const timeText = remaining > 0 ? formatSprintTime(remaining) : 'Ended';
+
+  return `<div class="sprint-repo-panel">
+    <div class="sprint-repo-header">
+      <span class="sprint-type-badge ${sprint.type}">${typeLabel}</span>
+      <span class="sprint-repo-timer">${remaining > 0 ? timeText + ' remaining' : timeText}</span>
+      <span class="sprint-repo-participants">${sprint.participants} entered</span>
+    </div>
+    <div class="sprint-lineup">${lineupHTML}</div>
+    <div class="sprint-lineup-total">
+      <span class="sprint-total-label">Total Power</span>
+      <span class="sprint-total-value">${lineupPower}</span>
+    </div>
+    <button class="sprint-commit-btn" id="sprint-commit-btn" ${canCommit ? '' : 'disabled'} data-sprint-id="${sprint.id}">${commitLabel}</button>
+    ${hasEntry ? `<div class="sprint-committed-msg">Committed with ${power} PWR${lineupPower > power ? ` — new lineup has ${lineupPower} PWR` : ''}</div>` : ''}
+    <div class="sprint-rewards-table">
+      <div class="sprint-rewards-title">Rewards</div>
+      ${BRACKETS.map(([label, packs]) => `<div class="sprint-reward-row"><span class="sprint-reward-bracket">${label}</span><span class="sprint-reward-packs">${packs} pack${packs > 1 ? 's' : ''}</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+// Client-side auto-select (mirrors server logic)
+function autoSelectLineupClient() {
+  const RARITY_ORDER = ['common', 'rare', 'epic', 'legendary', 'mythic'];
+  const owned = allContributors.filter(c => library[c.login]).map(c => ({ login: c.login, rarity: c.rarity, power: c.power }));
+  const byRarity = {};
+  for (const c of owned) {
+    if (!byRarity[c.rarity]) byRarity[c.rarity] = [];
+    byRarity[c.rarity].push(c);
+  }
+  for (const r of Object.keys(byRarity)) byRarity[r].sort((a, b) => b.power - a.power);
+
+  const used = new Set();
+  const result = { card_common: null, card_rare: null, card_epic: null, card_legendary: null, card_mythic: null };
+
+  function pickExact(rarity) {
+    for (const c of (byRarity[rarity] || [])) {
+      if (!used.has(c.login)) { used.add(c.login); return c.login; }
+    }
+    return null;
+  }
+
+  function pickAtOrBelow(maxRarity) {
+    const maxIdx = RARITY_ORDER.indexOf(maxRarity);
+    for (let i = maxIdx; i >= 0; i--) {
+      const login = pickExact(RARITY_ORDER[i]);
+      if (login) return login;
+    }
+    return null;
+  }
+
+  result.card_common = pickExact('common');
+  result.card_rare = pickExact('rare');
+  result.card_epic = pickExact('epic');
+  result.card_legendary = pickAtOrBelow('legendary');
+  result.card_mythic = pickAtOrBelow('mythic');
+  return result;
+}
+
+async function commitSprintLineup(sprintId) {
+  const btn = document.getElementById('sprint-commit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Committing...'; }
+
+  try {
+    const res = await fetch('/api/sprints/commit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sprintId }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      // Update sprint data in memory
+      if (_sprintData) {
+        for (const key of ['daily', 'weekly']) {
+          const s = _sprintData[key];
+          if (s && s.id === sprintId) {
+            const wasAlreadyCommitted = s.myEntry && s.myEntry.committedAt;
+            s.myEntry = {
+              totalPower: data.lineup.totalPower,
+              committedAt: data.committedAt,
+              cardCommon: data.lineup.cardCommon,
+              cardRare: data.lineup.cardRare,
+              cardEpic: data.lineup.cardEpic,
+              cardLegendary: data.lineup.cardLegendary,
+              cardMythic: data.lineup.cardMythic,
+            };
+            if (!wasAlreadyCommitted) {
+              s.participants = (s.participants || 0) + 1;
+            }
+          }
+        }
+      }
+      // Re-render repo view to show updated sprint panel
+      if (repoLoaded) renderRepoInfoFromCurrent();
+      // Re-render dashboard sprint section
+      const section = document.getElementById('sprints-section');
+      if (section && _sprintData) renderSprints(section, _sprintData);
+    } else {
+      if (btn) { btn.disabled = false; btn.textContent = 'Commit Lineup'; }
+    }
+  } catch {
+    if (btn) { btn.disabled = false; btn.textContent = 'Commit Lineup'; }
+  }
+}
+
+async function showPastSprintsOverlay() {
+  const overlay = document.createElement('div');
+  overlay.className = 'sprint-overlay';
+
+  overlay.innerHTML = `<div class="sprint-overlay-content">
+    <button class="sprint-overlay-close" id="sprint-overlay-close">&times;</button>
+    <h2 class="sprint-overlay-title">Past Sprints</h2>
+    <div class="sprint-past-list" id="sprint-past-list">
+      <div class="sprint-past-loading">Loading...</div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener('keydown', overlay._escHandler);
+  }
+
+  overlay._escHandler = e => { if (e.code === 'Escape') close(); };
+  document.addEventListener('keydown', overlay._escHandler);
+  overlay.querySelector('#sprint-overlay-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  // Load past sprints
+  try {
+    const res = await fetch('/api/sprints/past?limit=20');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    renderPastSprintsList(overlay, data.entries, data.total);
+  } catch {
+    const el = document.getElementById('sprint-past-list');
+    if (el) el.innerHTML = '<div class="sprint-past-empty">Failed to load past sprints.</div>';
+  }
+}
+
+function renderPastSprintsList(overlay, entries, total) {
+  const list = overlay.querySelector('#sprint-past-list');
+  if (!entries || entries.length === 0) {
+    list.innerHTML = '<div class="sprint-past-empty">No past sprints yet. Enter your first sprint from the dashboard!</div>';
+    return;
+  }
+
+  list.innerHTML = entries.map(e => {
+    const repoName = `${e.repoOwner}/${e.repoName}`;
+    const typeLabel = e.type === 'daily' ? 'Daily' : 'Weekly';
+    const date = new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const rankText = e.committedAt ? `#${e.rank}/${e.participants}` : 'Did not commit';
+    const bracketText = e.committedAt ? getBracketLabel(e.percentile) : '';
+    const packsText = e.packsWon > 0 ? `${e.packsWon} pack${e.packsWon > 1 ? 's' : ''}` : '';
+
+    let actionHTML = '';
+    if (e.packsWon > 0 && !e.packsClaimed) {
+      actionHTML = `<button class="sprint-claim-btn" data-claim-entry="${e.id}">Claim ${e.packsWon} pack${e.packsWon > 1 ? 's' : ''}</button>`;
+    } else if (e.packsClaimed) {
+      actionHTML = `<span class="sprint-claimed-check">Claimed</span>`;
+    }
+
+    return `<div class="sprint-past-entry" data-sprint-id="${e.sprintId}">
+      <div class="sprint-past-main">
+        <div class="sprint-past-info">
+          <span class="sprint-past-type ${e.type}">${typeLabel}</span>
+          <span class="sprint-past-repo">${repoName}</span>
+          <span class="sprint-past-date">${date}</span>
+        </div>
+        <div class="sprint-past-result">
+          <span class="sprint-past-power">${e.totalPower} PWR</span>
+          <span class="sprint-past-rank">${rankText}</span>
+          ${bracketText ? `<span class="sprint-past-bracket">${bracketText}</span>` : ''}
+          ${packsText ? `<span class="sprint-past-packs">${packsText}</span>` : ''}
+        </div>
+      </div>
+      <div class="sprint-past-actions">
+        ${actionHTML}
+        <button class="sprint-rankings-btn" data-rankings-sprint="${e.sprintId}">View Rankings</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Wire claim buttons
+  list.querySelectorAll('[data-claim-entry]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const entryId = btn.dataset.claimEntry;
+      btn.disabled = true;
+      btn.textContent = 'Claiming...';
+      try {
+        const res = await fetch('/api/sprints/claim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entryId }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          btn.outerHTML = `<span class="sprint-claimed-check">Claimed ${data.packsAwarded} pack${data.packsAwarded > 1 ? 's' : ''}</span>`;
+          if (packState) packState.bonusPacks = data.newBonusPacks;
+          renderTopBarPacks();
+          if (repoLoaded) renderRepoInfoFromCurrent();
+          // Update unclaimed count on dashboard
+          if (_sprintData) {
+            _sprintData.unclaimedCount = Math.max(0, (_sprintData.unclaimedCount || 0) - 1);
+            const dashSection = document.getElementById('sprints-section');
+            if (dashSection) renderSprints(dashSection, _sprintData);
+          }
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Claim';
+        }
+      } catch {
+        btn.disabled = false;
+        btn.textContent = 'Claim';
+      }
+    });
+  });
+
+  // Wire rankings buttons
+  list.querySelectorAll('[data-rankings-sprint]').forEach(btn => {
+    btn.addEventListener('click', () => showRankingsOverlay(btn.dataset.rankingsSprint));
+  });
+}
+
+function getBracketLabel(percentile) {
+  if (percentile <= 10) return 'Top 10%';
+  if (percentile <= 25) return 'Top 25%';
+  if (percentile <= 50) return 'Top 50%';
+  return 'Participated';
+}
+
+async function showRankingsOverlay(sprintId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'sprint-overlay';
+
+  overlay.innerHTML = `<div class="sprint-overlay-content">
+    <button class="sprint-overlay-close" id="rankings-close">&times;</button>
+    <h2 class="sprint-overlay-title">Sprint Rankings</h2>
+    <div class="sprint-rankings-list" id="sprint-rankings-list">
+      <div class="sprint-past-loading">Loading...</div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+
+  function close() {
+    overlay.remove();
+    document.removeEventListener('keydown', overlay._escHandler);
+  }
+
+  overlay._escHandler = e => { if (e.code === 'Escape') close(); };
+  document.addEventListener('keydown', overlay._escHandler);
+  overlay.querySelector('#rankings-close').addEventListener('click', close);
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+
+  try {
+    const res = await fetch(`/api/sprints/${sprintId}/rankings?limit=50`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    renderRankingsList(overlay, data, sprintId);
+  } catch {
+    const el = document.getElementById('sprint-rankings-list');
+    if (el) el.innerHTML = '<div class="sprint-past-empty">Failed to load rankings.</div>';
+  }
+}
+
+function renderRankingsList(overlay, data, sprintId) {
+  const list = overlay.querySelector('#sprint-rankings-list');
+  const { sprint, entries, total } = data;
+
+  const repoName = `${sprint.repoOwner}/${sprint.repoName}`;
+  const typeLabel = sprint.type === 'daily' ? 'Daily' : 'Weekly';
+
+  let html = `<div class="sprint-rankings-header">
+    <span class="sprint-past-type ${sprint.type}">${typeLabel}</span>
+    <span class="sprint-rankings-repo">${repoName}</span>
+    <span class="sprint-rankings-count">${total} participants</span>
+  </div>`;
+
+  html += entries.map((e, i) => {
+    const medal = e.rank === 1 ? '<span class="lb-medal" style="color:#ffd700">&#x1F947;</span>' :
+                  e.rank === 2 ? '<span class="lb-medal" style="color:#c0c0c0">&#x1F948;</span>' :
+                  e.rank === 3 ? '<span class="lb-medal" style="color:#cd7f32">&#x1F949;</span>' : '';
+    const bracket = getBracketLabel(e.percentile);
+    const isYou = _currentUser && _currentUser.username === e.githubUsername;
+
+    return `<div class="sprint-rank-row${isYou ? ' sprint-rank-you' : ''}">
+      <span class="sprint-rank-num">${medal}#${e.rank}</span>
+      <img class="sprint-rank-avatar" src="${e.avatarUrl}" alt="" loading="lazy" />
+      <span class="sprint-rank-name${isYou ? ' sprint-rank-name-you' : ''}">${e.githubUsername}</span>
+      <span class="sprint-rank-power">${e.totalPower} PWR</span>
+      <span class="sprint-rank-bracket">${bracket}</span>
+      <span class="sprint-rank-packs">${e.packsWon} ${GP_ICON}</span>
+    </div>`;
+  }).join('');
+
+  // Load more button
+  if (entries.length < total) {
+    html += `<button class="lb-load-more" id="sprint-rankings-more" data-offset="${entries.length}">Load more</button>`;
+  }
+
+  list.innerHTML = html;
+
+  // Wire load more
+  wireRankingsLoadMore(list, sprintId);
+}
+
+function wireRankingsLoadMore(list, sprintId) {
+  const moreBtn = list.querySelector('#sprint-rankings-more');
+  if (!moreBtn) return;
+
+  moreBtn.addEventListener('click', async () => {
+    moreBtn.disabled = true;
+    moreBtn.textContent = 'Loading...';
+    const offset = parseInt(moreBtn.dataset.offset, 10);
+    try {
+      const res = await fetch(`/api/sprints/${sprintId}/rankings?limit=50&offset=${offset}`);
+      if (!res.ok) { moreBtn.disabled = false; moreBtn.textContent = 'Load more'; return; }
+      const moreData = await res.json();
+      moreBtn.remove();
+
+      const newRows = (moreData.entries || []).map(e => {
+        const medal = e.rank <= 3 ? ['&#x1F947;', '&#x1F948;', '&#x1F949;'][e.rank - 1] : '';
+        const bracket = getBracketLabel(e.percentile);
+        const isYou = _currentUser && _currentUser.username === e.githubUsername;
+        return `<div class="sprint-rank-row${isYou ? ' sprint-rank-you' : ''}">
+          <span class="sprint-rank-num">${medal ? `<span class="lb-medal">${medal}</span>` : ''}#${e.rank}</span>
+          <img class="sprint-rank-avatar" src="${e.avatarUrl}" alt="" loading="lazy" />
+          <span class="sprint-rank-name${isYou ? ' sprint-rank-name-you' : ''}">${e.githubUsername}</span>
+          <span class="sprint-rank-power">${e.totalPower} PWR</span>
+          <span class="sprint-rank-bracket">${bracket}</span>
+          <span class="sprint-rank-packs">${e.packsWon} ${GP_ICON}</span>
+        </div>`;
+      }).join('');
+
+      list.insertAdjacentHTML('beforeend', newRows);
+
+      if (offset + (moreData.entries || []).length < moreData.total) {
+        list.insertAdjacentHTML('beforeend', `<button class="lb-load-more" id="sprint-rankings-more" data-offset="${offset + moreData.entries.length}">Load more</button>`);
+        wireRankingsLoadMore(list, sprintId);
+      }
+    } catch { /* silent */ }
+  });
+}
+
 // ===== REFERRAL INFO =====
 async function loadReferralInfo() {
   if (!_currentUser) return;
@@ -1474,7 +2005,18 @@ function renderRepoInfo(owner, repo) {
           </div>
         </details>`;
       }
-      const leftCol = _currentUser ? `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>` : '';
+      // Check if this repo is an active sprint
+      const activeSprint = getActiveSprintForRepo(`${owner}/${repo}`);
+
+      let leftCol = '';
+      if (_currentUser && activeSprint) {
+        // Sprint repo: show sprint panel open, achievements locked
+        leftCol = `<details class="repo-panel-collapse" id="sprint-panel" open><summary class="repo-panel-toggle">Sprint <span class="beta-tag">BETA</span></summary>${renderSprintPanel(activeSprint)}</details>
+          <details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements <span class="panel-summary sprint-ach-locked">Disabled for sprint repos to keep competition fair</span></summary>${achievementHTML}</details>`;
+      } else if (_currentUser) {
+        leftCol = `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>`;
+      }
+
       const pointsTotal = (() => {
         const tb = computeRepoBasePoints(allContributors, library);
         return tb + computeCompletionBonus(tb, isComplete);
@@ -1520,8 +2062,12 @@ function renderRepoInfo(owner, repo) {
 
   // Panel open/close logic: achievements & stars open on desktop; on mobile, only if actionable
   const _isMobile = window.innerWidth <= 768;
+  const sprintPanel = document.getElementById('sprint-panel');
   const achPanel = document.getElementById('achievements-panel');
-  if (achPanel) {
+  if (sprintPanel) {
+    // Sprint panel is always open (set via HTML 'open' attribute)
+    // Achievement panel stays CLOSED on sprint repos
+  } else if (achPanel) {
     if (!_isMobile || document.querySelector('.ach-slot.claimable, #ach-claim-all')) {
       achPanel.setAttribute('open', '');
     }
@@ -1532,6 +2078,12 @@ function renderRepoInfo(owner, repo) {
     if (!_isMobile || document.getElementById('revert-all-btn') || document.getElementById('cherry-pick-all-btn')) {
       starsPanel.setAttribute('open', '');
     }
+  }
+
+  // Wire up sprint commit button
+  const sprintCommitBtn = document.getElementById('sprint-commit-btn');
+  if (sprintCommitBtn) {
+    sprintCommitBtn.addEventListener('click', () => commitSprintLineup(sprintCommitBtn.dataset.sprintId));
   }
 
   // Wire up open pack button
@@ -2166,6 +2718,9 @@ function revealSelfCard(contributor, onDone) {
 
 // ===== CLAIM MILESTONE =====
 async function claimMilestone(statType, threshold) {
+  // Block achievement claims on sprint repos
+  if (getActiveSprintForRepo(currentRepoName)) return;
+
   const [owner, repo] = currentRepoName.split('/');
   const btn = document.querySelector(`[data-claim="${statType}-${threshold}"]`);
   if (btn) { btn.disabled = true; btn.textContent = 'Claiming...'; }
@@ -2303,6 +2858,9 @@ function revealMilestonePack(cards) {
 
 // ===== CLAIM ALL MILESTONES =====
 async function claimAllMilestones() {
+  // Block achievement claims on sprint repos
+  if (getActiveSprintForRepo(currentRepoName)) return;
+
   const claimable = getClaimableList();
   if (claimable.length === 0) return;
 

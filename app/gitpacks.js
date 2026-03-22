@@ -1069,25 +1069,16 @@ function renderSprints(section, data) {
       ${unclaimedBadge}
       <button class="sprint-past-btn" id="sprint-past-btn">Past Sprints</button>
     </div>
-    <div class="sprints-layout">
-      <div class="sprints-info">
-        <div class="sprints-desc">Open packs on the featured repo, build your best 5-card lineup, and compete for bonus packs.</div>
-        <div class="sprints-how">Your top card from each rarity is auto-selected. Commit your lineup before time runs out!</div>
-      </div>
-      <div class="sprints-cards">
-        ${sprintCardHTML(daily, 'Daily Sprint', maxDaily)}
-        ${sprintCardHTML(weekly, 'Weekly Sprint', maxWeekly)}
-      </div>
+    <div class="sprints-desc">Open packs on the featured repo, build your best 5-card lineup, and compete for bonus packs.</div>
+    <div class="sprints-cards">
+      ${sprintCardHTML(daily, 'Daily Sprint', maxDaily)}
+      ${sprintCardHTML(weekly, 'Weekly Sprint', maxWeekly)}
     </div>
   </div>`;
 
   // Wire repo links
   section.querySelectorAll('[data-sprint-repo]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const repo = btn.dataset.sprintRepo;
-      const [o, r] = repo.split('/');
-      if (o && r) { if (input) input.value = repo; loadRepo(o, r); }
-    });
+    btn.addEventListener('click', () => quickLoad(btn.dataset.sprintRepo));
   });
 
   // Wire past sprints button

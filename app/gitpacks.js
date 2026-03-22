@@ -1161,9 +1161,10 @@ function renderSprintPanel(sprint) {
     const card = cardLogin ? allContributors.find(c => c.login === cardLogin) : null;
     if (card) {
       lineupPower += card.power;
+      const rarityColor = RARITY_COLORS[card.rarity] || '#888';
       lineupHTML += `<div class="sprint-lineup-slot">
         <span class="sprint-slot-label" style="color:${slot.color}">${slot.label}</span>
-        <span class="sprint-slot-card">${card.login}</span>
+        <span class="sprint-slot-card">${card.login} <span class="sprint-card-rarity" style="color:${rarityColor};border-color:${rarityColor}40">${card.rarity}</span></span>
         <span class="sprint-slot-power">${card.power} PWR</span>
       </div>`;
     } else {
@@ -1188,7 +1189,12 @@ function renderSprintPanel(sprint) {
     <div class="panel-desc">Open packs on this repo and compete for bonus packs. Your best card from each rarity is auto-selected into your lineup.</div>
     <div class="sprint-repo-header">
       <span class="sprint-type-badge ${sprint.type}">${typeLabel}</span>
-      <span class="sprint-card-packs">Win up to ${maxPacks} packs</span>
+      <span class="sprint-packs-tooltip-wrap">
+        <span class="sprint-card-packs">Win up to ${maxPacks} packs &#9432;</span>
+        <div class="sprint-packs-tooltip">
+          ${BRACKETS.map(([label, packs]) => `<div class="sprint-reward-row"><span class="sprint-reward-bracket">${label}</span><span class="sprint-reward-packs">${packs} pack${packs > 1 ? 's' : ''}</span></div>`).join('')}
+        </div>
+      </span>
     </div>
     <div class="sprint-repo-meta">
       <span class="sprint-repo-timer">${remaining > 0 ? timeText + ' remaining' : timeText}</span>
@@ -1202,10 +1208,6 @@ function renderSprintPanel(sprint) {
     </div>
     <button class="sprint-commit-btn" id="sprint-commit-btn" ${canCommit ? '' : 'disabled'} data-sprint-id="${sprint.id}">${commitLabel}</button>
     ${hasEntry ? `<div class="sprint-committed-msg">Committed with ${power} PWR${lineupPower > power ? ` — new lineup has ${lineupPower} PWR` : ''}</div>` : ''}
-    <div class="sprint-rewards-table">
-      <div class="sprint-rewards-title">Rewards</div>
-      ${BRACKETS.map(([label, packs]) => `<div class="sprint-reward-row"><span class="sprint-reward-bracket">${label}</span><span class="sprint-reward-packs">${packs} pack${packs > 1 ? 's' : ''}</span></div>`).join('')}
-    </div>
   </div>`;
 }
 

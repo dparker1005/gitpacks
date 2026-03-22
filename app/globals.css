@@ -1257,7 +1257,7 @@
 
 
     /* ===== SPRINT REPO PANEL (in repo view) ===== */
-    .sprint-repo-panel { border:1px solid rgba(120,115,245,0.2); border-radius:12px; padding:16px 18px; background:rgba(15,15,35,0.6); }
+    .sprint-repo-panel { padding:12px 0 0; }
     .sprint-repo-header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
     .sprint-type-badge { font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; padding:3px 8px; border-radius:4px; }
     .sprint-type-badge.daily { color:#4adede; background:rgba(74,222,222,0.15); border:1px solid rgba(74,222,222,0.3); }

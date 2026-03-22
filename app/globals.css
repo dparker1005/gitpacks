@@ -155,6 +155,7 @@
     .repo-action-row { display:flex; justify-content:center; margin-top:14px; }
     .repo-panels-row { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:16px; max-width:900px; margin-left:auto; margin-right:auto; }
     .repo-panels-row > .repo-panel-collapse { flex:1 1 0; min-width:0; }
+    .repo-panels-left { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:12px; }
     .repo-panels-right { flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:12px; }
     .repo-panel-collapse .achievement-panel { margin:0; }
     .repo-panel-collapse .points-breakdown { margin-bottom:0; }

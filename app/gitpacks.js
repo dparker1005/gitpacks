@@ -2016,9 +2016,11 @@ function renderRepoInfo(owner, repo) {
 
       let leftCol = '';
       if (_currentUser && activeSprint) {
-        // Sprint repo: achievements locked, sprint panel below
-        leftCol = `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements <span class="panel-summary sprint-ach-locked">Disabled for sprint repos to keep competition fair</span></summary>${achievementHTML}</details>
-          <details class="repo-panel-collapse" id="sprint-panel" open><summary class="repo-panel-toggle">Sprint <span class="beta-tag">BETA</span></summary>${renderSprintPanel(activeSprint)}</details>`;
+        // Sprint repo: achievements locked, sprint panel stacked below (wrapped like right column)
+        leftCol = `<div class="repo-panels-left">
+          <details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements <span class="panel-summary sprint-ach-locked">Disabled for sprint repos to keep competition fair</span></summary>${achievementHTML}</details>
+          <details class="repo-panel-collapse" id="sprint-panel" open><summary class="repo-panel-toggle">Sprint <span class="beta-tag">BETA</span></summary>${renderSprintPanel(activeSprint)}</details>
+        </div>`;
       } else if (_currentUser) {
         leftCol = `<details class="repo-panel-collapse" id="achievements-panel"><summary class="repo-panel-toggle">Your Achievements</summary>${achievementHTML}</details>`;
       }

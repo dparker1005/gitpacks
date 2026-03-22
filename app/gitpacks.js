@@ -2462,6 +2462,7 @@ async function claimAllMilestones() {
 
 window.claimMilestone = claimMilestone;
 window.claimAllMilestones = claimAllMilestones;
+window.loadMoreLeaderboard = loadMoreLeaderboard;
 
 // ===== COMPLETE LIBRARY =====
 function setViewMode(mode) {

@@ -2,44 +2,45 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
 import { getCachedRepo } from '@/app/lib/repo-cache';
 
-const RARITY_SLOTS = ['common', 'rare', 'epic', 'legendary', 'mythic'] as const;
 const RARITY_ORDER: Record<string, number> = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
 
 /**
  * Auto-select the best lineup from a user's collection for a sprint repo.
- * Slots: mythic-or-lower, legendary-or-lower, epic, rare, common
- * Each card can only be used once. Strategy: fill from bottom (common) up.
+ * Fill top-down: mythic+ gets the absolute best card, then each slot below
+ * gets the best remaining card within its rarity cap.
+ *
+ * Slots (filled in order):
+ *   1. Mythic+:     any rarity (best card overall)
+ *   2. Legendary+:  legendary or lower (best unused, no mythic)
+ *   3. Epic+:       epic or lower (best unused, no legendary/mythic)
+ *   4. Rare+:       rare or lower (best unused, no epic/legendary/mythic)
+ *   5. Common:      common only
  */
 function autoSelectLineup(
   contributors: any[],
   library: Record<string, number>
 ): { card_common: string | null; card_rare: string | null; card_epic: string | null; card_legendary: string | null; card_mythic: string | null; total_power: number } {
-  // Get owned cards with their data
+  // Get owned cards sorted by power descending
   const owned = contributors
     .filter(c => library[c.login])
-    .map(c => ({ login: c.login, rarity: c.rarity, power: c.power }));
-
-  // Group by rarity
-  const byRarity: Record<string, typeof owned> = {};
-  for (const c of owned) {
-    if (!byRarity[c.rarity]) byRarity[c.rarity] = [];
-    byRarity[c.rarity].push(c);
-  }
-  // Sort each group by power descending
-  for (const r of Object.keys(byRarity)) {
-    byRarity[r].sort((a, b) => b.power - a.power);
-  }
+    .map(c => ({ login: c.login, rarity: c.rarity, power: c.power }))
+    .sort((a, b) => b.power - a.power);
 
   const used = new Set<string>();
-  const result: { card_common: string | null; card_rare: string | null; card_epic: string | null; card_legendary: string | null; card_mythic: string | null; total_power: number } = {
-    card_common: null, card_rare: null, card_epic: null, card_legendary: null, card_mythic: null, total_power: 0
+  const result = {
+    card_common: null as string | null,
+    card_rare: null as string | null,
+    card_epic: null as string | null,
+    card_legendary: null as string | null,
+    card_mythic: null as string | null,
+    total_power: 0,
   };
 
-  // Helper: pick best available card of exact rarity that hasn't been used
-  function pickExact(rarity: string): { login: string; power: number } | null {
-    const pool = byRarity[rarity] || [];
-    for (const c of pool) {
-      if (!used.has(c.login)) {
+  // Pick the highest-power unused card at or below a max rarity
+  function pickBest(maxRarity: number): { login: string; power: number } | null {
+    for (const c of owned) {
+      if (used.has(c.login)) continue;
+      if (RARITY_ORDER[c.rarity] <= maxRarity) {
         used.add(c.login);
         return c;
       }
@@ -47,34 +48,21 @@ function autoSelectLineup(
     return null;
   }
 
-  // Helper: pick best available card at or below a max rarity
-  function pickAtOrBelow(maxRarity: string): { login: string; power: number } | null {
-    const maxIdx = RARITY_ORDER[maxRarity];
-    // Try from highest allowed rarity down to common
-    for (let i = maxIdx; i >= 0; i--) {
-      const rarity = RARITY_SLOTS[i];
-      const pick = pickExact(rarity);
-      if (pick) return pick;
-    }
-    return null;
-  }
+  // Fill top-down: best card first, then best remaining within rarity cap
+  const mythic = pickBest(4);  // any rarity
+  if (mythic) { result.card_mythic = mythic.login; result.total_power += mythic.power; }
 
-  // Fill fixed-rarity slots first (bottom up: common, rare, epic)
-  const common = pickExact('common');
-  if (common) { result.card_common = common.login; result.total_power += common.power; }
-
-  const rare = pickExact('rare');
-  if (rare) { result.card_rare = rare.login; result.total_power += rare.power; }
-
-  const epic = pickExact('epic');
-  if (epic) { result.card_epic = epic.login; result.total_power += epic.power; }
-
-  // Flexible slots: legendary-or-lower, then mythic-or-lower
-  const legendary = pickAtOrBelow('legendary');
+  const legendary = pickBest(3);  // legendary or lower
   if (legendary) { result.card_legendary = legendary.login; result.total_power += legendary.power; }
 
-  const mythic = pickAtOrBelow('mythic');
-  if (mythic) { result.card_mythic = mythic.login; result.total_power += mythic.power; }
+  const epic = pickBest(2);  // epic or lower
+  if (epic) { result.card_epic = epic.login; result.total_power += epic.power; }
+
+  const rare = pickBest(1);  // rare or lower
+  if (rare) { result.card_rare = rare.login; result.total_power += rare.power; }
+
+  const common = pickBest(0);  // common only
+  if (common) { result.card_common = common.login; result.total_power += common.power; }
 
   return result;
 }

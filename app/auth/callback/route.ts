@@ -58,12 +58,15 @@ export async function GET(request: NextRequest) {
         }, { onConflict: 'id', ignoreDuplicates: true });
 
         // Always store/refresh the GitHub token (works for new and returning users)
-        console.log('[auth callback] provider_token present:', !!providerToken, 'session keys:', Object.keys(sessionData?.session ?? {}));
+        console.log('[auth callback] sessionData keys:', JSON.stringify(Object.keys(sessionData ?? {})));
+        console.log('[auth callback] session keys:', JSON.stringify(Object.keys(sessionData?.session ?? {})));
+        console.log('[auth callback] provider_token present:', !!providerToken);
+        console.log('[auth callback] provider_token value type:', typeof sessionData?.session?.provider_token);
         if (providerToken) {
           const { error: tokenErr } = await supabase.from('profiles')
             .update({ github_token: providerToken })
             .eq('id', user.id);
-          if (tokenErr) console.error('[auth callback] token save error:', tokenErr);
+          console.log('[auth callback] token save result:', tokenErr ? tokenErr.message : 'success');
         }
 
         // Process referral for new users only

@@ -1354,7 +1354,7 @@ function renderPastSprintsList(overlay, entries, total) {
     const typeLabel = e.type === 'daily' ? 'Daily' : 'Weekly';
     const date = new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const rankText = e.committedAt ? `#${e.rank}/${e.participants}` : 'Did not commit';
-    const bracketText = e.committedAt ? getBracketLabel(e.percentile) : '';
+    const bracketText = e.committedAt ? getBracketLabel(e.packsWon, e.type) : '';
     const packsText = e.packsWon > 0 ? `${e.packsWon} pack${e.packsWon > 1 ? 's' : ''}` : '';
 
     let actionHTML = '';
@@ -1426,11 +1426,11 @@ function renderPastSprintsList(overlay, entries, total) {
   });
 }
 
-function getBracketLabel(percentile) {
-  if (percentile <= 10) return 'Top 10%';
-  if (percentile <= 25) return 'Top 25%';
-  if (percentile <= 50) return 'Top 50%';
-  return 'Participated';
+function getBracketLabel(packsWon, type) {
+  const daily = { 4: 'Top 10%', 3: 'Top 25%', 2: 'Top 50%', 1: 'Participated' };
+  const weekly = { 12: 'Top 10%', 9: 'Top 25%', 6: 'Top 50%', 3: 'Participated' };
+  const map = type === 'weekly' ? weekly : daily;
+  return map[packsWon] || 'Participated';
 }
 
 async function showRankingsOverlay(sprintId) {
@@ -1485,7 +1485,7 @@ function renderRankingsList(overlay, data, sprintId) {
     const medal = e.rank === 1 ? '<span class="lb-medal" style="color:#ffd700">&#x1F947;</span>' :
                   e.rank === 2 ? '<span class="lb-medal" style="color:#c0c0c0">&#x1F948;</span>' :
                   e.rank === 3 ? '<span class="lb-medal" style="color:#cd7f32">&#x1F949;</span>' : '';
-    const bracket = getBracketLabel(e.percentile);
+    const bracket = getBracketLabel(e.packsWon, sprint.type);
     const isYou = _currentUser && _currentUser.username === e.githubUsername;
 
     return `<div class="sprint-rank-row${isYou ? ' sprint-rank-you' : ''}">
@@ -1525,7 +1525,7 @@ function wireRankingsLoadMore(list, sprintId) {
 
       const newRows = (moreData.entries || []).map(e => {
         const medal = e.rank <= 3 ? ['&#x1F947;', '&#x1F948;', '&#x1F949;'][e.rank - 1] : '';
-        const bracket = getBracketLabel(e.percentile);
+        const bracket = getBracketLabel(e.packsWon, moreData.sprint.type);
         const isYou = _currentUser && _currentUser.username === e.githubUsername;
         return `<div class="sprint-rank-row${isYou ? ' sprint-rank-you' : ''}">
           <span class="sprint-rank-num">${medal ? `<span class="lb-medal">${medal}</span>` : ''}#${e.rank}</span>

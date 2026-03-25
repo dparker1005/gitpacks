@@ -269,6 +269,9 @@ DECLARE
   v_pct NUMERIC(5,2);
   v_packs INT;
   v_lock_key BIGINT;
+  v_top10 INT;
+  v_top25 INT;
+  v_top50 INT;
 BEGIN
   -- Only callable from service role (cron endpoint)
   IF current_setting('role', true) NOT IN ('service_role', 'postgres') THEN
@@ -301,6 +304,12 @@ BEGIN
 
   IF v_total = 0 THEN RETURN; END IF;
 
+  -- Compute tier boundaries, ensuring each tier gets at least 1 slot
+  -- (so with 2 people: 1st=Top10%, 2nd=Top25%, not "Participated")
+  v_top10 := GREATEST(CEIL(v_total * 0.10)::INT, 1);
+  v_top25 := GREATEST(CEIL(v_total * 0.25)::INT, v_top10 + 1);
+  v_top50 := GREATEST(CEIL(v_total * 0.50)::INT, v_top25 + 1);
+
   -- Rank by total_power DESC; ties get the same rank (dense ranking for percentile, but standard for placement)
   v_current_rank := 0;
   v_prev_power := NULL;
@@ -325,13 +334,13 @@ BEGIN
 
     -- Determine packs based on bracket
     -- Tie-breaking: use v_rank (same for all tied), so all tied users at a boundary get the better bracket
-    IF v_rank <= GREATEST(CEIL(v_total * 0.10), 1) THEN
+    IF v_rank <= v_top10 THEN
       -- Top 10%
       IF v_type = 'daily' THEN v_packs := 4; ELSE v_packs := 12; END IF;
-    ELSIF v_rank <= GREATEST(CEIL(v_total * 0.25), 1) THEN
+    ELSIF v_rank <= v_top25 THEN
       -- Top 25%
       IF v_type = 'daily' THEN v_packs := 3; ELSE v_packs := 9; END IF;
-    ELSIF v_rank <= GREATEST(CEIL(v_total * 0.50), 1) THEN
+    ELSIF v_rank <= v_top50 THEN
       -- Top 50%
       IF v_type = 'daily' THEN v_packs := 2; ELSE v_packs := 6; END IF;
     ELSE

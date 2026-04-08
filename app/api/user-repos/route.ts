@@ -11,10 +11,23 @@ export async function GET() {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
 
-  const { data: collections, error } = await supabase
-    .from('user_collections')
-    .select('owner_repo, contributor_login')
-    .eq('user_id', user.id);
+  // Fetch all rows — Supabase default limit is 1000, so paginate to avoid truncation
+  let collections: any[] = [];
+  let from = 0;
+  const PAGE_SIZE = 1000;
+  let error: any = null;
+  while (true) {
+    const { data, error: pageError } = await supabase
+      .from('user_collections')
+      .select('owner_repo, contributor_login')
+      .eq('user_id', user.id)
+      .range(from, from + PAGE_SIZE - 1);
+    if (pageError) { error = pageError; break; }
+    if (!data || data.length === 0) break;
+    collections = collections.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

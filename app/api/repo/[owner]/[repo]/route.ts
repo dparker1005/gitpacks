@@ -782,7 +782,10 @@ export async function GET(
     if (cached) {
       return NextResponse.json(cached.data, {
         headers: {
-          'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+          // Our Supabase cache is the source of truth. Browser caching would
+          // mask fetched-at updates and pin users to pre-header-change responses
+          // for up to 24h after any deploy.
+          'Cache-Control': 'no-store',
           'X-Gitpacks-Source': 'cache',
           'X-Gitpacks-Fetched-At': cached.fetchedAt,
         },

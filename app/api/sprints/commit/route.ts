@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
-import { getCachedRepo } from '@/app/lib/repo-cache';
+import { getCachedRepoData } from '@/app/lib/repo-cache';
 
 const RARITY_ORDER: Record<string, number> = { common: 0, rare: 1, epic: 2, legendary: 3, mythic: 4 };
 
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     const ownerRepo = `${sprint.repo_owner}/${sprint.repo_name}`.toLowerCase();
 
     // Get repo data for card info
-    const repoData = await getCachedRepo(ownerRepo);
+    const repoData = await getCachedRepoData(ownerRepo);
     if (!repoData || !Array.isArray(repoData)) {
       return NextResponse.json({ error: 'Repo data not cached' }, { status: 404 });
     }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { getCachedRepo } from '@/app/lib/repo-cache';
+import { getCachedRepoData } from '@/app/lib/repo-cache';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
 import { getOrCreateProfile } from '@/app/lib/profile';
 import { selectPackCards, Contributor } from '@/app/lib/pack-cards';
@@ -19,7 +19,7 @@ export async function GET(
   }
 
   const cacheKey = `${owner}/${repo}`.toLowerCase();
-  const cached = await getCachedRepo(cacheKey);
+  const cached = await getCachedRepoData(cacheKey);
 
   if (!cached) {
     return NextResponse.json(

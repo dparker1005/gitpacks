@@ -246,6 +246,27 @@
     .progress-bar-wrap { height:6px; background:#1a1a3a; border-radius:3px; overflow:hidden; margin-top:8px; }
     .progress-bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#7873f5,#4adede); border-radius:3px; transition:width 0.3s ease; }
     #error { display:none; text-align:center; padding:20px; color:#ff6b6b; font-size:1.1rem; }
+    #error .err-primary { font-size:1rem; margin-bottom:12px; }
+    #error .err-details { display:inline-block; text-align:left; margin-top:8px; max-width:640px; width:100%; background:rgba(255,107,107,0.06); border:1px solid rgba(255,107,107,0.2); border-radius:8px; padding:0; color:#d8d8e0; }
+    #error .err-details summary { cursor:pointer; padding:10px 14px; font-size:0.75rem; color:#aaa; font-family:'Rajdhani',sans-serif; letter-spacing:1px; text-transform:uppercase; list-style:none; }
+    #error .err-details summary::-webkit-details-marker { display:none; }
+    #error .err-details[open] summary { border-bottom:1px solid rgba(255,107,107,0.15); }
+    #error .err-failure { padding:10px 14px; border-bottom:1px solid rgba(255,107,107,0.08); font-size:0.8rem; font-family:'Rajdhani',sans-serif; }
+    #error .err-failure:last-child { border-bottom:none; }
+    #error .err-failure-head { display:flex; gap:10px; align-items:baseline; margin-bottom:4px; }
+    #error .err-step { font-family:'Orbitron',sans-serif; font-size:0.7rem; text-transform:uppercase; letter-spacing:1px; color:#ff6b6b; }
+    #error .err-last-status { font-size:0.7rem; color:#888; }
+    #error .err-endpoint { font-family:ui-monospace,monospace; font-size:0.72rem; color:#7aa; word-break:break-all; }
+    #error .err-attempts { color:#999; margin-top:3px; }
+    #error .err-msg { color:#ccc; margin-top:3px; font-style:italic; }
+
+    /* === REPO FRESHNESS PILL + REFRESH BUTTON === */
+    .repo-freshness { display:flex; align-items:center; justify-content:center; gap:10px; margin-top:8px; font-family:'Rajdhani',sans-serif; font-size:0.78rem; color:#888; letter-spacing:0.5px; }
+    .repo-freshness-partial { color:#fbbf24; }
+    .repo-freshness-label { font-weight:500; }
+    .repo-freshness-btn { padding:4px 12px; border:1px solid #3a3a5a; border-radius:8px; background:rgba(120,115,245,0.08); color:#c4c0ff; cursor:pointer; font-family:'Orbitron',sans-serif; font-size:0.55rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; transition:all 0.15s; }
+    .repo-freshness-btn:hover:not(:disabled) { background:rgba(120,115,245,0.2); border-color:#6a6ada; color:#fff; }
+    .repo-freshness-btn:disabled { opacity:0.5; cursor:wait; }
 
     /* === REPO INFO === */
     #repo-info { display:none; text-align:center; padding:10px 20px 20px; }

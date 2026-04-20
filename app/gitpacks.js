@@ -46,6 +46,8 @@ let packCountdownInterval = null;
 let guestPacksRemaining = 1; // for logged-out users
 let lastAchievementData = null; // achievement data for current repo
 let starBalance = 0; // per-repo star balance for card recycling
+let repoFetchedAt = null; // ISO timestamp of when the cards were last pulled from GitHub
+let repoPartialMeta = null; // { failures: [{step, endpoint, attempts, lastStatus, totalWaitedMs, message}] } when last refresh was partial
 let _referralInfo = null; // { referralCode, referralCount, maxReferrals, sharedOnX }
 
 // Global space handler — only one at a time, avoids stacking conflicts
@@ -1743,10 +1745,15 @@ async function loadRepo(fromHomepage, repoOverride) {
 
     const response = await fetch(`/api/repo/${owner}/${repo}`);
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Failed to load repo');
+      const err = await response.json().catch(() => ({}));
+      const e = new Error(err.error || 'Failed to load repo');
+      e.details = err.details || null;
+      throw e;
     }
     allContributors = await response.json();
+    repoFetchedAt = response.headers.get('X-Gitpacks-Fetched-At') || null;
+    const partialMetaHeader = response.headers.get('X-Gitpacks-Partial-Meta');
+    repoPartialMeta = partialMetaHeader ? tryDecodePartialMeta(partialMetaHeader) : null;
 
     library = {};
     repoLoaded = true;
@@ -1803,8 +1810,73 @@ async function loadRepo(fromHomepage, repoOverride) {
       const target = allContributors.find(c => c.login.toLowerCase() === urlCard.toLowerCase());
       if (target) openFullscreenCard(target);
     }
-  } catch (err) { console.error('[GHTC] loadRepo error:', err.message, err.stack); showError(err.message); loading.style.display = 'none'; }
+  } catch (err) { console.error('[GHTC] loadRepo error:', err.message, err.stack); showError(err.message, err.details); loading.style.display = 'none'; }
   if (btn) btn.disabled = false;
+}
+
+// Decode the base64-JSON X-Gitpacks-Partial-Meta header. Any error → null (we
+// degrade silently; the UI still has cards, just no failure breakdown).
+function tryDecodePartialMeta(header) {
+  try {
+    const json = atob(header);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+// Human-readable "2 hours ago" / "5 days ago" for the updated-at pill.
+function formatTimeAgo(iso) {
+  if (!iso) return 'unknown';
+  const ms = Date.now() - new Date(iso).getTime();
+  if (ms < 0) return 'just now';
+  const secs = Math.floor(ms / 1000);
+  if (secs < 60) return 'just now';
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins} min${mins === 1 ? '' : 's'} ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  const months = Math.floor(days / 30);
+  return `${months} month${months === 1 ? '' : 's'} ago`;
+}
+
+// Returns true if the cached data is > 24h old — we only surface the Refresh
+// button past this threshold to avoid nudging people to re-fetch fresh data.
+function shouldOfferRefresh(fetchedAtIso) {
+  if (!fetchedAtIso) return true;
+  return Date.now() - new Date(fetchedAtIso).getTime() > 24 * 60 * 60 * 1000;
+}
+
+async function refreshRepoData() {
+  if (!currentRepoName) return;
+  const parts = currentRepoName.match(/^([^/]+)\/([^/]+)/);
+  if (!parts) return;
+  const [, owner, repo] = parts;
+  const btn = document.getElementById('refresh-repo-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Refreshing…'; }
+  showError('');
+
+  try {
+    const res = await fetch(`/api/repo/${owner}/${repo}?refresh=true`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const e = new Error(err.error || 'Refresh failed');
+      e.details = err.details || null;
+      throw e;
+    }
+    allContributors = await res.json();
+    repoFetchedAt = res.headers.get('X-Gitpacks-Fetched-At') || new Date().toISOString();
+    const partialMetaHeader = res.headers.get('X-Gitpacks-Partial-Meta');
+    repoPartialMeta = partialMetaHeader ? tryDecodePartialMeta(partialMetaHeader) : null;
+    renderRepoInfo(owner, repo);
+    renderLibrary();
+  } catch (err) {
+    console.error('[GHTC] refreshRepoData error:', err);
+    showError(err.message, err.details);
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh data'; }
+  }
 }
 
 function renderRepoInfo(owner, repo) {
@@ -1989,6 +2061,16 @@ function renderRepoInfo(owner, repo) {
     </div>`;
   }
 
+  const offerRefresh = shouldOfferRefresh(repoFetchedAt);
+  const isPartial = !!repoPartialMeta;
+  const updatedLabel = repoFetchedAt ? formatTimeAgo(repoFetchedAt) : 'not yet cached';
+  const freshnessHTML = `<div class="repo-freshness${isPartial ? ' repo-freshness-partial' : ''}">
+      <span class="repo-freshness-label">${isPartial ? 'Partial data' : 'Updated'} ${updatedLabel}</span>
+      ${offerRefresh || isPartial
+        ? `<button class="repo-freshness-btn" id="refresh-repo-btn" title="Re-fetch this repo's contributor data from GitHub">Refresh data</button>`
+        : ''}
+    </div>`;
+
   repoInfo.innerHTML = `<div class="repo-info-row">
       <div class="repo-info-inner${isComplete ? ' repo-info-complete' : ''}">
         <h2><span>${owner || ''}</span> / <span>${repo || ''}</span></h2>
@@ -1998,6 +2080,7 @@ function renderRepoInfo(owner, repo) {
       </div>
       <button class="switch-repo-btn" id="switch-repo-btn">Switch Repo</button>
     </div>
+    ${freshnessHTML}
     ${authNudge}
     <div class="repo-action-row">
       <div class="action-buttons">
@@ -2154,6 +2237,10 @@ function renderRepoInfo(owner, repo) {
   // Wire up switch repo button
   const switchBtn = document.getElementById('switch-repo-btn');
   if (switchBtn) switchBtn.addEventListener('click', () => newRepo());
+
+  // Wire up refresh data button — explicit user-triggered re-fetch from GitHub
+  const refreshBtn = document.getElementById('refresh-repo-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => refreshRepoData());
 
   // Wire up achievement claim buttons
   repoInfo.querySelectorAll('[data-claim]').forEach(btn => {
@@ -3206,7 +3293,37 @@ function renderRepoInfoFromCurrent() {
 }
 
 // ===== HELPERS =====
-function showError(m) { errorEl.textContent = m; errorEl.style.display = m ? 'block' : 'none'; }
+function showError(m, details) {
+  if (!m) { errorEl.innerHTML = ''; errorEl.style.display = 'none'; return; }
+  // Plain string error (no structured details) — keep the old simple look.
+  if (!details || !details.failures || !details.failures.length) {
+    errorEl.innerHTML = escapeHtml(m);
+    errorEl.style.display = 'block';
+    return;
+  }
+  // Structured error: main message + collapsible technical breakdown.
+  const failuresHTML = details.failures.map((f) => {
+    const attempts = Array.isArray(f.attempts) ? f.attempts : [];
+    const statusList = attempts.map((a) => a.status).join(', ') || 'n/a';
+    const waited = f.totalWaitedMs ? `${Math.round(f.totalWaitedMs / 1000)}s` : '0s';
+    return `<div class="err-failure">
+      <div class="err-failure-head"><span class="err-step">${escapeHtml(f.step)}</span> <span class="err-last-status">HTTP ${f.lastStatus ?? '—'}</span></div>
+      <div class="err-endpoint">${escapeHtml(f.endpoint || '')}</div>
+      <div class="err-attempts">Attempts: ${escapeHtml(String(statusList))} &middot; waited ${waited}</div>
+      ${f.message ? `<div class="err-msg">${escapeHtml(f.message)}</div>` : ''}
+    </div>`;
+  }).join('');
+  errorEl.innerHTML = `
+    <div class="err-primary">${escapeHtml(m)}</div>
+    <details class="err-details"><summary>Technical details</summary>
+      ${failuresHTML}
+    </details>`;
+  errorEl.style.display = 'block';
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
 // ===== FULLSCREEN CARD VIEW =====
 function openFullscreenCard(c) {

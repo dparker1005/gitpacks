@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
-import { getCachedRepo } from '@/app/lib/repo-cache';
+import { getCachedRepoData } from '@/app/lib/repo-cache';
 import { refreshUserScores } from '@/app/lib/scoring';
 import { CHERRY_PICK_COST } from '@/app/lib/recycling';
 
@@ -19,7 +19,7 @@ export async function POST(
   const ownerRepo = `${owner}/${repo}`.toLowerCase();
 
   // Fetch repo data for rarity lookup
-  const repoData = await getCachedRepo(ownerRepo);
+  const repoData = await getCachedRepoData(ownerRepo);
   if (!repoData || !Array.isArray(repoData)) {
     return NextResponse.json({ error: 'Repo data not cached' }, { status: 404 });
   }

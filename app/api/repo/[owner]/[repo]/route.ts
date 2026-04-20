@@ -16,31 +16,102 @@ function fmt(n: number): string {
   return n.toString();
 }
 
+// Strip the token from a GitHub API URL for safe logging in error payloads.
+function publicUrl(u: string) {
+  return u.replace(/[?&]access_token=[^&]+/gi, '');
+}
+
+type AttemptLog = { status: number; waitedMs: number };
+
+export type StepFailure = {
+  step: 'stats' | 'issues' | 'contributors' | 'repo';
+  endpoint: string;
+  attempts: AttemptLog[];
+  totalWaitedMs: number;
+  lastStatus: number | null;
+  message: string;
+};
+
+type StepOk<T> = { ok: true; step: StepFailure['step']; data: T; attempts: AttemptLog[] };
+type StepErr = { ok: false } & StepFailure;
+type StepResult<T> = StepOk<T> | StepErr;
+
 // ===== fetchWithRetry =====
-async function fetchWithRetry(url: string, ghToken?: string): Promise<any> {
+// Returns a structured result so callers can surface per-attempt status codes.
+// Retries on 202 (GitHub's async-computing signal) with increasing backoff.
+async function fetchWithRetry(
+  step: StepFailure['step'],
+  url: string,
+  ghToken?: string
+): Promise<StepResult<any>> {
   const headers = gitHubHeaders(ghToken);
-  const maxAttempts = 4;
-  const delays = [3000, 8000, 15000]; // increasing delays between retries
-  for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(url, { headers });
+  const delays = [3000, 8000, 15000, 25000, 40000]; // up to ~91s total for slow repos
+  const attempts: AttemptLog[] = [];
+  let totalWaitedMs = 0;
+  let lastStatus: number | null = null;
+
+  for (let i = 0; i <= delays.length; i++) {
+    let res: Response;
+    try {
+      res = await fetch(url, { headers });
+    } catch (e: any) {
+      attempts.push({ status: 0, waitedMs: totalWaitedMs });
+      return {
+        ok: false,
+        step,
+        endpoint: publicUrl(url),
+        attempts,
+        totalWaitedMs,
+        lastStatus: 0,
+        message: `Network error contacting GitHub: ${e?.message || 'unknown'}`,
+      };
+    }
+    lastStatus = res.status;
+    attempts.push({ status: res.status, waitedMs: totalWaitedMs });
+
     if (res.status === 202) {
-      if (i >= maxAttempts - 1) break;
+      if (i >= delays.length) break;
       await sleep(delays[i]);
+      totalWaitedMs += delays[i];
       continue;
     }
-    if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
-    return res.json();
+    if (!res.ok) {
+      return {
+        ok: false,
+        step,
+        endpoint: publicUrl(url),
+        attempts,
+        totalWaitedMs,
+        lastStatus,
+        message: `GitHub returned ${res.status} for ${step}`,
+      };
+    }
+    const data = await res.json();
+    return { ok: true, step, data, attempts };
   }
-  throw new Error('GitHub is still computing stats for this repo. Please try again in a minute.');
+
+  return {
+    ok: false,
+    step,
+    endpoint: publicUrl(url),
+    attempts,
+    totalWaitedMs,
+    lastStatus,
+    message:
+      step === 'stats'
+        ? `GitHub is still computing contributor stats after ${attempts.length} attempts (${Math.round(totalWaitedMs / 1000)}s). For large/active repos this can take 60s+ or fail repeatedly.`
+        : `GitHub kept returning 202 after ${attempts.length} attempts.`,
+  };
 }
 
 async function fetchAllIssues(
   owner: string,
   repo: string,
   ghToken?: string,
-): Promise<Record<string, { prsMerged: number; issues: number; avatar: string }>> {
+): Promise<StepResult<Record<string, { prsMerged: number; issues: number; avatar: string }>>> {
   const headers = gitHubHeaders(ghToken);
   const stats: Record<string, { prsMerged: number; issues: number; avatar: string }> = {};
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/issues`;
 
   const ensure = (login: string, avatar: string) => {
     if (!stats[login]) stats[login] = { prsMerged: 0, issues: 0, avatar: avatar || '' };
@@ -63,24 +134,28 @@ async function fetchAllIssues(
   // Fetch pages in parallel batches of 10, up to 50 pages (5000 issues)
   let page = 1;
   let done = false;
+  let rateLimitedFirstPage = false;
+  let firstPageStatus: number | null = null;
+
   while (!done && page <= 50) {
     const batch = [];
     for (let i = 0; i < 10 && page + i <= 50; i++) {
       const p = page + i;
       batch.push(
-        fetch(`https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=100&page=${p}`, { headers })
+        fetch(`${endpoint}?state=all&per_page=100&page=${p}`, { headers })
           .then(async (res) => {
-            if (res.status === 403 || res.status === 429) return { page: p, data: null, rateLimited: true };
-            if (!res.ok) return { page: p, data: null, rateLimited: false };
+            if (res.status === 403 || res.status === 429) return { page: p, data: null, rateLimited: true, status: res.status };
+            if (!res.ok) return { page: p, data: null, rateLimited: false, status: res.status };
             const data = await res.json();
-            return { page: p, data, rateLimited: false };
+            return { page: p, data, rateLimited: false, status: res.status };
           })
       );
     }
     const results = await Promise.all(batch);
     for (const r of results.sort((a, b) => a.page - b.page)) {
+      if (r.page === 1) firstPageStatus = r.status;
       if (r.rateLimited) {
-        if (r.page === 1) throw new Error('Rate limited fetching issues. Add a GitHub token for higher limits.');
+        if (r.page === 1) { rateLimitedFirstPage = true; done = true; break; }
         done = true; break;
       }
       if (!r.data || !r.data.length) { done = true; break; }
@@ -89,32 +164,53 @@ async function fetchAllIssues(
     page += 10;
   }
 
-  return stats;
+  if (rateLimitedFirstPage) {
+    return {
+      ok: false,
+      step: 'issues',
+      endpoint,
+      attempts: [{ status: firstPageStatus ?? 429, waitedMs: 0 }],
+      totalWaitedMs: 0,
+      lastStatus: firstPageStatus ?? 429,
+      message: 'Rate limited fetching issues on first page. Sign in to use your own GitHub token for higher limits.',
+    };
+  }
+
+  return {
+    ok: true,
+    step: 'issues',
+    data: stats,
+    attempts: [{ status: firstPageStatus ?? 200, waitedMs: 0 }],
+  };
 }
 
 async function fetchPaginatedContributors(
   owner: string,
   repo: string,
   ghToken?: string,
-): Promise<Array<{ login: string; avatar: string; contributions: number }>> {
+): Promise<StepResult<Array<{ login: string; avatar: string; contributions: number }>>> {
   const headers = gitHubHeaders(ghToken);
   const all: Array<{ login: string; avatar: string; contributions: number }> = [];
+  const endpoint = `https://api.github.com/repos/${owner}/${repo}/contributors`;
 
   // Fetch all 10 pages in parallel
   const batch = [];
   for (let p = 1; p <= 10; p++) {
     batch.push(
-      fetch(`https://api.github.com/repos/${owner}/${repo}/contributors?per_page=100&page=${p}`, { headers })
+      fetch(`${endpoint}?per_page=100&page=${p}`, { headers })
         .then(async (res) => {
-          if (!res.ok) return { page: p, data: null };
+          if (!res.ok) return { page: p, data: null as any[] | null, status: res.status };
           const data = await res.json();
-          return { page: p, data: Array.isArray(data) ? data : null };
+          return { page: p, data: Array.isArray(data) ? data : null, status: res.status };
         })
-        .catch(() => ({ page: p, data: null }))
+        .catch(() => ({ page: p, data: null as any[] | null, status: 0 }))
     );
   }
   const results = await Promise.all(batch);
-  for (const r of results.sort((a, b) => a.page - b.page)) {
+  const sorted = results.sort((a, b) => a.page - b.page);
+  const firstPageStatus = sorted[0]?.status ?? 0;
+
+  for (const r of sorted) {
     if (!r.data || r.data.length === 0) break;
     r.data.forEach((c: any) => {
       if (c.login && c.type !== 'Bot') {
@@ -123,7 +219,26 @@ async function fetchPaginatedContributors(
     });
     if (r.data.length < 100) break; // last page
   }
-  return all;
+
+  // Only treat as a failure if page 1 itself errored — partial pagination is fine.
+  if (!sorted[0]?.data && firstPageStatus !== 0 && (firstPageStatus < 200 || firstPageStatus >= 300)) {
+    return {
+      ok: false,
+      step: 'contributors',
+      endpoint,
+      attempts: [{ status: firstPageStatus, waitedMs: 0 }],
+      totalWaitedMs: 0,
+      lastStatus: firstPageStatus,
+      message: `GitHub returned ${firstPageStatus} for /contributors on page 1`,
+    };
+  }
+
+  return {
+    ok: true,
+    step: 'contributors',
+    data: all,
+    attempts: [{ status: firstPageStatus || 200, waitedMs: 0 }],
+  };
 }
 
 // ===== getBestCharacteristic =====
@@ -517,30 +632,27 @@ function processAllContributors(
   return entries.sort((a: any, b: any) => b.power - a.power);
 }
 
-// ===== GET handler =====
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ owner: string; repo: string }> }
-) {
-  const { owner, repo } = await params;
+/** Serialize a StepFailure for the client — keeps the shape tight and predictable. */
+function failureToJson(f: StepFailure) {
+  return {
+    step: f.step,
+    endpoint: f.endpoint,
+    lastStatus: f.lastStatus,
+    attempts: f.attempts,
+    totalWaitedMs: f.totalWaitedMs,
+    message: f.message,
+  };
+}
 
-  if (!owner || !repo) {
-    return NextResponse.json({ error: 'Missing owner or repo' }, { status: 400 });
-  }
-
+/**
+ * Do the actual GitHub fetch → process → cache → respond flow.
+ * Called only on cache miss or explicit ?refresh=true — never on the hot path.
+ */
+async function fetchAndCacheRepo(owner: string, repo: string, ghToken: string | undefined) {
   const cacheKey = `${owner}/${repo}`.toLowerCase();
 
-  // Resolve user's GitHub token for rate-limit distribution (falls back to server token)
-  let ghToken: string | undefined;
-  try {
-    const supabase = await getSupabaseServer();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      ghToken = await getGitHubToken(supabase, user.id);
-    }
-  } catch { /* anonymous request — use server token */ }
-
-  // Block forked repos — forks share contributors with the parent and are exploitable
+  // Block forked repos — forks share contributors with the parent and are exploitable.
+  // Only runs during a refresh, so we pay the fork-check cost at most once per repo.
   try {
     const headers = gitHubHeaders(ghToken);
     const repoRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers });
@@ -556,78 +668,127 @@ export async function GET(
     }
   } catch { /* non-critical — allow through if check fails */ }
 
-  // Check for refresh bypass
+  // Fetch all three data sources in parallel; allSettled-style so one slow/failing
+  // step doesn't force us to abandon usable data from the others.
+  const [statsRes, issuesRes, contribRes] = await Promise.all([
+    fetchWithRetry('stats', `https://api.github.com/repos/${owner}/${repo}/stats/contributors`, ghToken),
+    fetchAllIssues(owner, repo, ghToken),
+    fetchPaginatedContributors(owner, repo, ghToken),
+  ]);
+
+  const statsData = statsRes.ok ? statsRes.data : null;
+  const issueStats = issuesRes.ok ? issuesRes.data : {};
+  const extraContributors = contribRes.ok ? contribRes.data : [];
+
+  const validStats: any[] = Array.isArray(statsData)
+    ? statsData.filter((c: any) => c.author && c.author.login && c.author.type !== 'Bot')
+    : [];
+
+  const haveAnything = validStats.length > 0 || extraContributors.length > 0;
+
+  if (!haveAnything) {
+    // Every data source failed. Return a structured error with per-step details
+    // so the UI can tell the user exactly which GitHub endpoint is misbehaving.
+    const failures = [statsRes, issuesRes, contribRes].filter((r) => !r.ok) as StepErr[];
+    const primary = failures[0];
+    return NextResponse.json(
+      {
+        error: primary?.message || 'Failed to fetch any contributor data from GitHub.',
+        details: { failures: failures.map(failureToJson) },
+      },
+      { status: 502 }
+    );
+  }
+
+  const result = processAllContributors(validStats, issueStats, extraContributors);
+
+  if (result.length < MIN_REPO_CONTRIBUTORS) {
+    return NextResponse.json(
+      { error: `This repo only has ${result.length} contributor${result.length === 1 ? '' : 's'}. Collections require at least ${MIN_REPO_CONTRIBUTORS}.` },
+      { status: 400 }
+    );
+  }
+
+  const isPartial = !statsRes.ok || !issuesRes.ok || !contribRes.ok;
+  const failures = [statsRes, issuesRes, contribRes].filter((r) => !r.ok) as StepErr[];
+
+  // Capture latest commit SHA + issue number — used to detect change if we later
+  // re-add automatic refresh. Cheap, two calls, non-critical if they fail.
+  let commitSha: string | null = null;
+  let issueNumber: number | null = null;
+  try {
+    const ghHeaders = gitHubHeaders(ghToken);
+    const [commitRes, issueRes] = await Promise.all([
+      fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers: ghHeaders }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/issues?per_page=1&state=all&sort=created&direction=desc`, { headers: ghHeaders }),
+    ]);
+    if (commitRes.ok) {
+      const commits = await commitRes.json();
+      if (Array.isArray(commits) && commits.length > 0) commitSha = commits[0].sha;
+    }
+    if (issueRes.ok) {
+      const issues = await issueRes.json();
+      if (Array.isArray(issues) && issues.length > 0) issueNumber = issues[0].number;
+    }
+  } catch { /* non-critical */ }
+
+  // Always cache what we have, even partial. Degraded cards beat a stuck loading
+  // spinner, and the user can hit Refresh later to try for a full recomputation.
+  await setCachedRepo(cacheKey, result, commitSha, issueNumber);
+  invalidateOgCache(owner, repo).catch(() => {});
+
+  const headers: Record<string, string> = {
+    'Cache-Control': 'no-store',
+    'X-Gitpacks-Source': isPartial ? 'partial' : 'fresh',
+    'X-Gitpacks-Fetched-At': new Date().toISOString(),
+  };
+  if (isPartial) {
+    headers['X-Gitpacks-Partial-Reason'] = !statsRes.ok ? 'stats' : !issuesRes.ok ? 'issues' : 'contributors';
+    // Attach failure details as a base64 JSON header so the UI can surface them
+    // alongside the successfully-rendered (but incomplete) cards.
+    headers['X-Gitpacks-Partial-Meta'] = Buffer.from(
+      JSON.stringify({ failures: failures.map(failureToJson) })
+    ).toString('base64');
+  }
+  return NextResponse.json(result, { headers });
+}
+
+// ===== GET handler =====
+// Cache-first: any existing row is returned immediately, no GitHub call.
+// Refresh is explicit (?refresh=true), triggered by the user via a UI button.
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ owner: string; repo: string }> }
+) {
+  const { owner, repo } = await params;
+
+  if (!owner || !repo) {
+    return NextResponse.json({ error: 'Missing owner or repo' }, { status: 400 });
+  }
+
+  const cacheKey = `${owner}/${repo}`.toLowerCase();
   const refresh = request.nextUrl.searchParams.get('refresh') === 'true';
 
-  // Check cache
+  // Resolve user's GitHub token — only needed for the refresh path.
+  let ghToken: string | undefined;
+  try {
+    const supabase = await getSupabaseServer();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) ghToken = await getGitHubToken(supabase, user.id);
+  } catch { /* anonymous — server token */ }
+
   if (!refresh) {
-    const cached = await getCachedRepo(cacheKey, ghToken);
+    const cached = await getCachedRepo(cacheKey);
     if (cached) {
-      return NextResponse.json(cached, {
-        headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
+      return NextResponse.json(cached.data, {
+        headers: {
+          'Cache-Control': 'public, max-age=86400, s-maxage=86400',
+          'X-Gitpacks-Source': 'cache',
+          'X-Gitpacks-Fetched-At': cached.fetchedAt,
+        },
       });
     }
   }
 
-  try {
-    // Fetch all three data sources in parallel
-    const [statsData, issueStats, extraContributors] = await Promise.all([
-      fetchWithRetry(`https://api.github.com/repos/${owner}/${repo}/stats/contributors`, ghToken),
-      fetchAllIssues(owner, repo, ghToken),
-      fetchPaginatedContributors(owner, repo, ghToken),
-    ]);
-
-    if (!Array.isArray(statsData)) {
-      return NextResponse.json({ error: 'Failed to fetch contributor stats from GitHub' }, { status: 502 });
-    }
-
-    // Filter out deleted accounts and bots (author can be null for deleted GitHub users)
-    const validStats = statsData.filter((c: any) => c.author && c.author.login && c.author.type !== 'Bot');
-
-    if (validStats.length === 0 && extraContributors.length === 0) {
-      return NextResponse.json({ error: 'No contributor data found' }, { status: 404 });
-    }
-
-    // Process into card data
-    const result = processAllContributors(validStats, issueStats, extraContributors);
-
-    // Enforce minimum repo size
-    if (result.length < MIN_REPO_CONTRIBUTORS) {
-      return NextResponse.json(
-        { error: `This repo only has ${result.length} contributor${result.length === 1 ? '' : 's'}. Collections require at least ${MIN_REPO_CONTRIBUTORS}.` },
-        { status: 400 }
-      );
-    }
-
-    // Capture latest commit SHA and issue number for smart cache invalidation (2 lightweight calls)
-    let commitSha: string | null = null;
-    let issueNumber: number | null = null;
-    try {
-      const ghHeaders = gitHubHeaders(ghToken);
-      const [commitRes, issueRes] = await Promise.all([
-        fetch(`https://api.github.com/repos/${owner}/${repo}/commits?per_page=1`, { headers: ghHeaders }),
-        fetch(`https://api.github.com/repos/${owner}/${repo}/issues?per_page=1&state=all&sort=created&direction=desc`, { headers: ghHeaders }),
-      ]);
-      if (commitRes.ok) {
-        const commits = await commitRes.json();
-        if (Array.isArray(commits) && commits.length > 0) commitSha = commits[0].sha;
-      }
-      if (issueRes.ok) {
-        const issues = await issueRes.json();
-        if (Array.isArray(issues) && issues.length > 0) issueNumber = issues[0].number;
-      }
-    } catch { /* non-critical — cache will still work with time-based fallback */ }
-
-    // Cache result with invalidation baseline and issue stats for incremental fetching
-    await setCachedRepo(cacheKey, result, commitSha, issueNumber);
-
-    // Invalidate cached OG images so they regenerate with updated card data
-    invalidateOgCache(owner, repo).catch(() => {});
-
-    return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=86400' },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
-  }
+  return fetchAndCacheRepo(owner, repo, ghToken);
 }

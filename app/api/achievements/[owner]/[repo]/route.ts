@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedRepo, supabase as publicSupabase } from '@/app/lib/repo-cache';
+import { getCachedRepoData, supabase as publicSupabase } from '@/app/lib/repo-cache';
 import { getSupabaseServer } from '@/app/lib/supabase-server';
 import { getOrCreateProfile } from '@/app/lib/profile';
 import { selectPackCards, Contributor } from '@/app/lib/pack-cards';
@@ -85,7 +85,7 @@ export async function GET(
     }
 
     const ownerRepo = `${owner}/${repo}`.toLowerCase();
-    const cached = await getCachedRepo(ownerRepo);
+    const cached = await getCachedRepoData(ownerRepo);
     if (!cached || !Array.isArray(cached)) {
       return NextResponse.json({ isContributor: false, selfCard: null, milestones: {}, maxPerStat: 0, cardCount: 0 });
     }
@@ -218,7 +218,7 @@ export async function POST(
     }
 
     const ownerRepo = `${owner}/${repo}`.toLowerCase();
-    const cached = await getCachedRepo(ownerRepo);
+    const cached = await getCachedRepoData(ownerRepo);
     if (!cached || !Array.isArray(cached)) {
       return NextResponse.json({ error: 'Repo data not cached' }, { status: 404 });
     }

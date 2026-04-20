@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCachedRepo } from '@/app/lib/repo-cache';
+import { getCachedRepoData } from '@/app/lib/repo-cache';
 
 export async function GET(
   request: NextRequest,
@@ -7,7 +7,7 @@ export async function GET(
 ) {
   const { owner, repo, login } = await params;
   const cacheKey = `${owner}/${repo}`.toLowerCase();
-  const cached = await getCachedRepo(cacheKey);
+  const cached = await getCachedRepoData(cacheKey);
 
   if (!cached || !Array.isArray(cached)) {
     return NextResponse.json({ error: 'Repo not cached' }, { status: 404 });

@@ -668,39 +668,51 @@ async function fetchAndCacheRepo(owner: string, repo: string, ghToken: string | 
     }
   } catch { /* non-critical — allow through if check fails */ }
 
-  // Fetch all three data sources in parallel; allSettled-style so one slow/failing
-  // step doesn't force us to abandon usable data from the others.
+  // Fetch all three data sources in parallel. We require ALL to succeed — partial
+  // data produces broken cards (missing weekly stats collapse streaks/peak/consistency
+  // to 0, and every contributor ends up tagged as first committer).
   const [statsRes, issuesRes, contribRes] = await Promise.all([
     fetchWithRetry('stats', `https://api.github.com/repos/${owner}/${repo}/stats/contributors`, ghToken),
     fetchAllIssues(owner, repo, ghToken),
     fetchPaginatedContributors(owner, repo, ghToken),
   ]);
 
-  const statsData = statsRes.ok ? statsRes.data : null;
-  const issueStats = issuesRes.ok ? issuesRes.data : {};
-  const extraContributors = contribRes.ok ? contribRes.data : [];
+  const failures = [statsRes, issuesRes, contribRes].filter((r) => !r.ok) as StepErr[];
 
-  const validStats: any[] = Array.isArray(statsData)
-    ? statsData.filter((c: any) => c.author && c.author.login && c.author.type !== 'Bot')
-    : [];
-
-  const haveAnything = validStats.length > 0 || extraContributors.length > 0;
-
-  if (!haveAnything) {
-    // Every data source failed. Return a structured error with per-step details
-    // so the UI can tell the user exactly which GitHub endpoint is misbehaving.
-    const failures = [statsRes, issuesRes, contribRes].filter((r) => !r.ok) as StepErr[];
-    const primary = failures[0];
+  if (failures.length > 0) {
+    // Don't overwrite or create a cache row with incomplete data. If the user is
+    // refreshing an already-cached repo, hand back the existing cache unchanged
+    // so they keep seeing good data; otherwise surface the error.
+    const existing = await getCachedRepo(cacheKey);
+    const partialMeta = Buffer.from(JSON.stringify({ failures: failures.map(failureToJson) })).toString('base64');
+    if (existing) {
+      return NextResponse.json(existing.data, {
+        headers: {
+          'Cache-Control': 'no-store',
+          'X-Gitpacks-Source': 'cache-refresh-failed',
+          'X-Gitpacks-Fetched-At': existing.fetchedAt,
+          'X-Gitpacks-Refresh-Failed': failures[0].step,
+          'X-Gitpacks-Partial-Meta': partialMeta,
+        },
+      });
+    }
     return NextResponse.json(
       {
-        error: primary?.message || 'Failed to fetch any contributor data from GitHub.',
+        error: failures[0].message || 'Failed to fetch complete data from GitHub.',
         details: { failures: failures.map(failureToJson) },
       },
       { status: 502 }
     );
   }
 
-  const result = processAllContributors(validStats, issueStats, extraContributors);
+  // Past the failure gate — all three are ok. Narrow the union so we can read .data.
+  if (!statsRes.ok || !issuesRes.ok || !contribRes.ok) throw new Error('unreachable');
+
+  const validStats: any[] = Array.isArray(statsRes.data)
+    ? statsRes.data.filter((c: any) => c.author && c.author.login && c.author.type !== 'Bot')
+    : [];
+
+  const result = processAllContributors(validStats, issuesRes.data, contribRes.data);
 
   if (result.length < MIN_REPO_CONTRIBUTORS) {
     return NextResponse.json(
@@ -708,9 +720,6 @@ async function fetchAndCacheRepo(owner: string, repo: string, ghToken: string | 
       { status: 400 }
     );
   }
-
-  const isPartial = !statsRes.ok || !issuesRes.ok || !contribRes.ok;
-  const failures = [statsRes, issuesRes, contribRes].filter((r) => !r.ok) as StepErr[];
 
   // Capture latest commit SHA + issue number — used to detect change if we later
   // re-add automatic refresh. Cheap, two calls, non-critical if they fail.
@@ -732,25 +741,16 @@ async function fetchAndCacheRepo(owner: string, repo: string, ghToken: string | 
     }
   } catch { /* non-critical */ }
 
-  // Always cache what we have, even partial. Degraded cards beat a stuck loading
-  // spinner, and the user can hit Refresh later to try for a full recomputation.
   await setCachedRepo(cacheKey, result, commitSha, issueNumber);
   invalidateOgCache(owner, repo).catch(() => {});
 
-  const headers: Record<string, string> = {
-    'Cache-Control': 'no-store',
-    'X-Gitpacks-Source': isPartial ? 'partial' : 'fresh',
-    'X-Gitpacks-Fetched-At': new Date().toISOString(),
-  };
-  if (isPartial) {
-    headers['X-Gitpacks-Partial-Reason'] = !statsRes.ok ? 'stats' : !issuesRes.ok ? 'issues' : 'contributors';
-    // Attach failure details as a base64 JSON header so the UI can surface them
-    // alongside the successfully-rendered (but incomplete) cards.
-    headers['X-Gitpacks-Partial-Meta'] = Buffer.from(
-      JSON.stringify({ failures: failures.map(failureToJson) })
-    ).toString('base64');
-  }
-  return NextResponse.json(result, { headers });
+  return NextResponse.json(result, {
+    headers: {
+      'Cache-Control': 'no-store',
+      'X-Gitpacks-Source': 'fresh',
+      'X-Gitpacks-Fetched-At': new Date().toISOString(),
+    },
+  });
 }
 
 // ===== GET handler =====

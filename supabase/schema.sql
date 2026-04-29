@@ -281,8 +281,10 @@ BEGIN
             WHEN collection_completions.is_complete THEN collection_completions.completed_at
             ELSE NOW()
           END;
-    ELSIF comp IS NOT NULL THEN
-      -- Was previously complete, now incomplete
+    ELSIF comp.user_id IS NOT NULL THEN
+      -- Was previously complete, now incomplete. Check a NOT NULL column
+      -- (user_id) rather than `comp IS NOT NULL` — record-level IS NOT NULL
+      -- requires *every* field non-null, and insured_at is nullable.
       IF comp.insured THEN
         bonus := (score.base_points * 0.5)::INT;
       ELSE

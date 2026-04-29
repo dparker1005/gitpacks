@@ -148,6 +148,17 @@ function isPlainNavClick(e) {
   return e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
 }
 
+// Rarity badge sits inside the row's <a>, so it has to be a span — emulate link semantics by hand.
+document.addEventListener('click', (e) => {
+  const badge = e.target.closest && e.target.closest('.my-rarity-badge[data-card-href]');
+  if (!badge) return;
+  const href = badge.dataset.cardHref;
+  e.preventDefault();
+  e.stopPropagation();
+  if (!isPlainNavClick(e)) window.open(href, '_blank', 'noopener');
+  else window.location.href = href;
+});
+
 // ===== PACK STATE =====
 // Show skeleton while pack state loads
 if (_currentUser) {
@@ -306,7 +317,8 @@ async function loadPopularRepos(featuredRepo) {
 
     function myRarityBadge(r) {
       if (!r.my_rarity || !_currentUser) return '';
-      return `<a href="/?repo=${r.name}&card=${_currentUser.username}" class="my-rarity-badge ${r.my_rarity}" onclick="event.stopPropagation()">${r.my_rarity}</a>`;
+      const href = `/?repo=${r.name}&card=${_currentUser.username}`;
+      return `<span class="my-rarity-badge ${r.my_rarity}" data-card-href="${href}" role="link" tabindex="0">${r.my_rarity}</span>`;
     }
 
     function repoBtn(r, showProgressBar) {

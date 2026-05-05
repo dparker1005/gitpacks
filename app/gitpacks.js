@@ -3573,6 +3573,7 @@ function openFullscreenCard(c) {
       <div class="fullscreen-profile-links">
         <a class="fullscreen-profile" href="https://github.com/${c.login}" target="_blank" rel="noopener">${GH_ICON} GitHub</a>
         <a class="fullscreen-profile" href="/profile/${encodeURIComponent(c.login)}">GitPacks Profile</a>
+        <a class="fullscreen-profile" href="/contributor/${encodeURIComponent(c.login)}">All Cards</a>
       </div>
       <div class="fullscreen-share-row">
         <button class="share-action-btn" id="fs-copy-link">Copy Link</button>

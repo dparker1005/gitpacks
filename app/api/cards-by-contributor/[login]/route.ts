@@ -52,26 +52,11 @@ export async function GET(
       (c: { login?: string }) => c?.login && c.login.toLowerCase() === loginLower
     );
     if (idx < 0) continue;
-    const c = row.data[idx];
     cards.push({
       owner_repo: row.owner_repo,
       card_num: idx + 1,
       total_cards: row.card_count || row.data.length,
-      contributor: {
-        login: c.login,
-        avatar: c.avatar,
-        rarity: c.rarity,
-        power: c.power,
-        title: c.title,
-        ability: c.ability || null,
-        commits: c.commits ?? 0,
-        prsMerged: c.prsMerged ?? 0,
-        issues: c.issues ?? 0,
-        maxStreak: c.maxStreak ?? 0,
-        peak: c.peak ?? 0,
-        activeWeeks: c.activeWeeks ?? 0,
-        totalWeeks: c.totalWeeks ?? 0,
-      },
+      contributor: row.data[idx],
       owned_count: ownedMap.get(row.owner_repo) || 0,
     });
   }

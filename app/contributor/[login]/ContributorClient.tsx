@@ -1,29 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-
-type Rarity = "mythic" | "legendary" | "epic" | "rare" | "common";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  buildGalleryCard,
+  fmt,
+  rarityColor,
+  type CardData,
+  type Rarity,
+} from "@/app/lib/card-html";
 
 interface CardEntry {
   owner_repo: string;
   card_num: number;
   total_cards: number;
   owned_count: number;
-  contributor: {
-    login: string;
-    avatar: string | null;
-    rarity: Rarity;
-    power: number;
-    title: string | null;
-    ability: { name?: string; desc?: string; icon?: string; color?: string } | null;
-    commits: number;
-    prsMerged: number;
-    issues: number;
-    maxStreak: number;
-    peak: number;
-    activeWeeks: number;
-    totalWeeks: number;
-  };
+  contributor: CardData;
 }
 
 interface ApiResponse {
@@ -45,6 +36,8 @@ export default function ContributorClient({ login }: { login: string }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<SortKey>("power");
   const [ownedFilter, setOwnedFilter] = useState<OwnedFilter>("all");
+  const [openCard, setOpenCard] = useState<CardEntry | null>(null);
+  const gridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +87,36 @@ export default function ContributorClient({ login }: { login: string }) {
     return pool;
   }, [data, filterRarity, search, sortBy, ownedFilter]);
 
+  // Hover tilt — mirrors the library's effect from gitpacks.js renderLibrary.
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const onMove = (e: MouseEvent) => {
+      const card = (e.target as HTMLElement).closest(".card") as HTMLElement | null;
+      if (!card) return;
+      const last = (card as HTMLElement & { _lastMove?: number })._lastMove;
+      if (last && Date.now() - last < 16) return;
+      (card as HTMLElement & { _lastMove?: number })._lastMove = Date.now();
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      card.style.transform = `rotateY(${x * 18}deg) rotateX(${-y * 18}deg) scale(1.04)`;
+      const shine = card.querySelector(".card-shine") as HTMLElement | null;
+      if (shine)
+        shine.style.background = `radial-gradient(circle at ${(x + 0.5) * 100}% ${(y + 0.5) * 100}%, rgba(255,255,255,0.15) 0%, transparent 60%)`;
+    };
+    const onLeave = (e: MouseEvent) => {
+      const card = (e.target as HTMLElement).closest(".card") as HTMLElement | null;
+      if (card) card.style.transform = "";
+    };
+    grid.addEventListener("mousemove", onMove);
+    grid.addEventListener("mouseleave", onLeave, true);
+    return () => {
+      grid.removeEventListener("mousemove", onMove);
+      grid.removeEventListener("mouseleave", onLeave, true);
+    };
+  }, [filtered.length]);
+
   const rarityCounts = useMemo(() => {
     const counts: Record<Rarity, number> = { mythic: 0, legendary: 0, epic: 0, rare: 0, common: 0 };
     if (data) for (const c of data.cards) counts[c.contributor.rarity]++;
@@ -139,9 +162,7 @@ export default function ContributorClient({ login }: { login: string }) {
       <a href="/" className="profile-back-link">← Back to GitPacks</a>
 
       <div className="contributor-header">
-        {avatar && (
-          <img src={avatar} alt={displayLogin} className="contributor-avatar" />
-        )}
+        {avatar && <img src={avatar} alt={displayLogin} className="contributor-avatar" />}
         <div className="contributor-header-info">
           <h1 className="contributor-username">{displayLogin}</h1>
           <p className="contributor-subtitle">
@@ -186,7 +207,9 @@ export default function ContributorClient({ login }: { login: string }) {
             </div>
             {data.viewer_authenticated && (
               <div className="profile-stat-card">
-                <div className="profile-stat-value">{ownedTotals.unique}/{totalRepos}</div>
+                <div className="profile-stat-value">
+                  {ownedTotals.unique}/{totalRepos}
+                </div>
                 <div className="profile-stat-label">You Own</div>
               </div>
             )}
@@ -238,41 +261,252 @@ export default function ContributorClient({ login }: { login: string }) {
           {filtered.length === 0 ? (
             <p className="profile-empty">No cards match the current filters.</p>
           ) : (
-            <div className="contributor-grid">
+            <div id="cards-grid" ref={gridRef}>
               {filtered.map((entry) => {
-                const c = entry.contributor;
                 const owned = entry.owned_count > 0;
-                const cardImg = `/api/card/${entry.owner_repo}/${encodeURIComponent(c.login)}`;
-                const cardLink = `/card/${entry.owner_repo}/${encodeURIComponent(c.login)}`;
+                const html = buildGalleryCard(
+                  entry.contributor,
+                  entry.card_num,
+                  entry.total_cards,
+                  entry.owner_repo
+                );
                 return (
-                  <a
+                  <div
                     key={entry.owner_repo}
-                    href={cardLink}
-                    className={`contributor-cell rarity-border-${c.rarity} ${owned ? "" : "ghost"}`}
-                    data-rarity={c.rarity}
+                    className={`card-wrapper clickable ${owned ? "" : "ghost-card"}`}
+                    data-rarity={entry.contributor.rarity}
+                    onClick={() => setOpenCard(entry)}
                   >
-                    <div className="contributor-cell-img">
-                      <img src={cardImg} alt={`${c.login} card for ${entry.owner_repo}`} loading="lazy" />
-                      {data.viewer_authenticated && entry.owned_count > 1 && (
-                        <span className="contributor-qty">x{entry.owned_count}</span>
-                      )}
-                      {data.viewer_authenticated && !owned && (
-                        <span className="contributor-missing-tag">Missing</span>
-                      )}
-                    </div>
-                    <div className="contributor-cell-meta">
-                      <span className="contributor-cell-repo" title={entry.owner_repo}>
-                        {entry.owner_repo}
-                      </span>
-                      <span className={`my-rarity-badge ${c.rarity}`}>{c.rarity}</span>
-                    </div>
-                  </a>
+                    <div dangerouslySetInnerHTML={{ __html: html }} />
+                    {data.viewer_authenticated && entry.owned_count > 1 && (
+                      <div className="card-qty">x{entry.owned_count}</div>
+                    )}
+                  </div>
                 );
               })}
             </div>
           )}
         </>
       )}
+
+      {openCard && (
+        <CardFullscreen
+          key={openCard.owner_repo}
+          entry={openCard}
+          onClose={() => setOpenCard(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function CardFullscreen({ entry, onClose }: { entry: CardEntry; onClose: () => void }) {
+  const c = entry.contributor;
+  const cardWrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  useEffect(() => {
+    const wrapper = cardWrapperRef.current;
+    if (!wrapper) return;
+    const card = wrapper.querySelector(".card") as HTMLElement | null;
+    if (!card) return;
+    const onMove = (e: MouseEvent) => {
+      const r = wrapper.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - 0.5;
+      const y = (e.clientY - r.top) / r.height - 0.5;
+      card.style.transform = `rotateY(${x * 20}deg) rotateX(${-y * 20}deg)`;
+      const shine = card.querySelector(".card-shine") as HTMLElement | null;
+      if (shine) {
+        shine.style.background = `radial-gradient(circle at ${(x + 0.5) * 100}% ${(y + 0.5) * 100}%, rgba(255,255,255,0.18) 0%, transparent 60%)`;
+        shine.style.opacity = "1";
+      }
+    };
+    const onLeave = () => {
+      card.style.transform = "";
+      const shine = card.querySelector(".card-shine") as HTMLElement | null;
+      if (shine) shine.style.opacity = "0";
+    };
+    wrapper.addEventListener("mousemove", onMove);
+    wrapper.addEventListener("mouseleave", onLeave);
+    return () => {
+      wrapper.removeEventListener("mousemove", onMove);
+      wrapper.removeEventListener("mouseleave", onLeave);
+    };
+  }, [entry]);
+
+  const html = useMemo(
+    () => buildGalleryCard(c, entry.card_num, entry.total_cards, entry.owner_repo),
+    [c, entry.card_num, entry.total_cards, entry.owner_repo]
+  );
+  const rc = rarityColor(c.rarity);
+  const dom = c.dominantStat;
+  const pct = c.pctScores || {};
+  const [weeksSinceFirst] = useState(() =>
+    c.firstCommitTs && isFinite(c.firstCommitTs)
+      ? Math.round((Date.now() / 1000 - c.firstCommitTs) / 604800)
+      : 0
+  );
+  const isGhost = entry.owned_count === 0;
+
+  function statRow(
+    label: string,
+    value: string,
+    pctVal: number | null,
+    color: string | null,
+    highlight: boolean
+  ) {
+    const p = Math.round((pctVal || 0) * 100);
+    const hl = highlight ? " fs-highlight" : "";
+    const topPct = Math.max(1, Math.ceil(100 - (pctVal || 0) * 100));
+    const pctLabel = topPct > 80 ? "Bottom 20%" : `Top ${topPct}%`;
+    const hlBorder =
+      highlight && color
+        ? { borderBottomColor: color + "30", borderLeftColor: color }
+        : undefined;
+    const hlText = highlight && color ? { color } : undefined;
+    return (
+      <div className={`fs-stat-row${hl}`} style={hlBorder}>
+        <div className="fs-stat-top">
+          <span className="fs-stat-label" style={hlText}>
+            {label}
+          </span>
+          <span className="fs-stat-value">{value}</span>
+        </div>
+        {pctVal != null && color && (
+          <div className="fs-pct-inline">
+            <div className="fs-pct-track">
+              <div className="fs-pct-fill" style={{ width: `${p}%`, background: color }} />
+            </div>
+            <span className="fs-pct-val" style={highlight ? { color } : undefined}>
+              {pctLabel}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`fullscreen-overlay ${isGhost ? "fullscreen-ghost" : ""}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="fullscreen-layout" onClick={(e) => e.stopPropagation()}>
+        <div className="fullscreen-close" onClick={onClose}>
+          CLOSE
+        </div>
+        <div className="fullscreen-card-container">
+          <div
+            ref={cardWrapperRef}
+            className="card-wrapper"
+            data-rarity={c.rarity}
+            style={{ opacity: 1, animation: "none" }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
+        <div className="fullscreen-stats-panel">
+          <h3>Details</h3>
+          {statRow("Total Commits", `${fmt(c.commits)} commits`, pct.commits ?? null, rc, false)}
+          {statRow(
+            "PRs Merged",
+            `${fmt(c.prsMerged)} PRs`,
+            pct.prsMerged ?? null,
+            "#4ade80",
+            dom === "prs"
+          )}
+          {statRow(
+            "Issues",
+            `${fmt(c.issues)} issues`,
+            pct.issues ?? null,
+            "#f472b6",
+            dom === "issues"
+          )}
+          <div className="fs-stat-row">
+            <div className="fs-stat-top">
+              <span className="fs-stat-label">Active Weeks</span>
+              <span className="fs-stat-value">
+                {c.activeWeeks} <span className="fs-stat-pct">/ {c.totalWeeks}</span> weeks
+              </span>
+            </div>
+            {pct.activeWeeks != null && (
+              <div className="fs-pct-inline">
+                <div className="fs-pct-track">
+                  <div
+                    className="fs-pct-fill"
+                    style={{ width: `${Math.round(pct.activeWeeks * 100)}%`, background: "#4adede" }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          {statRow(
+            "Best Streak",
+            `${c.maxStreak} weeks`,
+            pct.streak ?? null,
+            "#facc15",
+            dom === "streak"
+          )}
+          {statRow("Peak Week", `${c.peak} commits`, pct.peak ?? null, "#c084fc", dom === "peak")}
+          {statRow(
+            "Tenure",
+            weeksSinceFirst < 52
+              ? `${weeksSinceFirst}w`
+              : `${Math.round((weeksSinceFirst / 52) * 10) / 10}y`,
+            null,
+            null,
+            false
+          )}
+          <div className="fs-stat-row">
+            <div className="fs-stat-top">
+              <span className="fs-stat-label">Repo</span>
+              <span className="fs-stat-value">
+                <a href={`/?repo=${entry.owner_repo}`} className="fs-repo-link">
+                  {entry.owner_repo}
+                </a>
+              </span>
+            </div>
+          </div>
+          <div className="fs-stat-row">
+            <div className="fs-stat-top">
+              <span className="fs-stat-label">Owned</span>
+              <span className="fs-stat-value">{entry.owned_count}x</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="fullscreen-bottom" onClick={(e) => e.stopPropagation()}>
+        <div className="fullscreen-profile-links">
+          <a
+            className="fullscreen-profile"
+            href={`https://github.com/${c.login}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            GitHub
+          </a>
+          <a
+            className="fullscreen-profile"
+            href={`/?repo=${entry.owner_repo}&card=${encodeURIComponent(c.login)}`}
+          >
+            Open in Library
+          </a>
+          <a
+            className="fullscreen-profile"
+            href={`/card/${entry.owner_repo}/${encodeURIComponent(c.login)}`}
+          >
+            Share Card
+          </a>
+        </div>
+      </div>
     </div>
   );
 }

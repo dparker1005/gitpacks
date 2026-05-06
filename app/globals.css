@@ -1167,7 +1167,10 @@
     }
 
     /* ===== Contributor Cards Page ===== */
-    .contributor-page { max-width:1400px; margin:0 auto; padding:40px 20px 60px; min-height:100vh; }
+    /* Page chrome (header / stats / controls) is constrained, but the cards
+       grid spans full width to match the library's flex-wrap layout. */
+    .contributor-page { padding:40px 0 60px; min-height:100vh; }
+    .contributor-page-inner { max-width:1200px; margin:0 auto; padding:0 20px; }
     .contributor-loading, .contributor-error { text-align:center; padding:80px 20px; color:#888; font-family:'Rajdhani',sans-serif; font-size:1.1rem; }
     .contributor-error { color:#f87171; }
     .contributor-header { display:flex; align-items:center; gap:20px; margin-bottom:24px; flex-wrap:wrap; }

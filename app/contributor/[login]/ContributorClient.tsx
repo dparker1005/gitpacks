@@ -139,7 +139,9 @@ export default function ContributorClient({ login }: { login: string }) {
   if (loading) {
     return (
       <div className="contributor-page">
-        <div className="contributor-loading">Loading cards...</div>
+        <div className="contributor-page-inner">
+          <div className="contributor-loading">Loading cards...</div>
+        </div>
       </div>
     );
   }
@@ -147,8 +149,10 @@ export default function ContributorClient({ login }: { login: string }) {
   if (error || !data) {
     return (
       <div className="contributor-page">
-        <div className="contributor-error">{error || "No cards found"}</div>
-        <a href="/" className="profile-back-link">Back to GitPacks</a>
+        <div className="contributor-page-inner">
+          <div className="contributor-error">{error || "No cards found"}</div>
+          <a href="/" className="profile-back-link">Back to GitPacks</a>
+        </div>
       </div>
     );
   }
@@ -159,6 +163,7 @@ export default function ContributorClient({ login }: { login: string }) {
 
   return (
     <div className="contributor-page">
+      <div className="contributor-page-inner">
       <a href="/" className="profile-back-link">← Back to GitPacks</a>
 
       <div className="contributor-header">
@@ -258,35 +263,38 @@ export default function ContributorClient({ login }: { login: string }) {
             )}
           </div>
 
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && (
             <p className="profile-empty">No cards match the current filters.</p>
-          ) : (
-            <div id="cards-grid" ref={gridRef}>
-              {filtered.map((entry) => {
-                const owned = entry.owned_count > 0;
-                const html = buildGalleryCard(
-                  entry.contributor,
-                  entry.card_num,
-                  entry.total_cards,
-                  entry.owner_repo
-                );
-                return (
-                  <div
-                    key={entry.owner_repo}
-                    className={`card-wrapper clickable ${owned ? "" : "ghost-card"}`}
-                    data-rarity={entry.contributor.rarity}
-                    onClick={() => setOpenCard(entry)}
-                  >
-                    <div dangerouslySetInnerHTML={{ __html: html }} />
-                    {data.viewer_authenticated && entry.owned_count > 1 && (
-                      <div className="card-qty">x{entry.owned_count}</div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           )}
         </>
+      )}
+      </div>
+
+      {totalRepos > 0 && filtered.length > 0 && (
+        <div id="cards-grid" ref={gridRef}>
+          {filtered.map((entry) => {
+            const owned = entry.owned_count > 0;
+            const html = buildGalleryCard(
+              entry.contributor,
+              entry.card_num,
+              entry.total_cards,
+              entry.owner_repo
+            );
+            return (
+              <div
+                key={entry.owner_repo}
+                className={`card-wrapper clickable ${owned ? "" : "ghost-card"}`}
+                data-rarity={entry.contributor.rarity}
+                onClick={() => setOpenCard(entry)}
+              >
+                <div dangerouslySetInnerHTML={{ __html: html }} />
+                {data.viewer_authenticated && entry.owned_count > 1 && (
+                  <div className="card-qty">x{entry.owned_count}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {openCard && (
